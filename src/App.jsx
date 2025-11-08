@@ -8,6 +8,7 @@ import {
   PasswordReset,
   ResetPassword,
 } from './pages/Authentication'
+import CourseStructure from './pages/Resource/CourseStructure'
 
 function App() {
   return (
@@ -18,6 +19,8 @@ function App() {
       <Route path="/password-reset-notification" element={<PasswordReset />} />
       <Route path="/change-password" element={<ChangePassword />} />
       <Route path="/confirmation" element={<Confirmation />} />
+      <Route path="/" element={<PrivateStorage/>} />
+      <Route path="/courses" element={<CourseStructure/>} />
       <Route path="/about" element={<h1>About Page</h1>} />
     </Routes>
   )

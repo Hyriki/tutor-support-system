@@ -66,8 +66,8 @@ const sampleFiles = [
     {
         "title": "video_backup.zip",
         "type": "zip",
-        "size": "1.8",
-        "size_unit": "GB"
+        "size": "200",
+        "size_unit": "MB"
     },
     {
         "title": "notes.txt",

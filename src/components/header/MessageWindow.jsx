@@ -143,7 +143,7 @@ export default function MessageWindow({ isOpen, onClose }) {
                                     }}
                                 >
                                     {/* Avatar */}
-                                    <div className={`relative w-10 h-10 ${chat.avatarColor} rounded-full flex items-center justify-center mr-3 font-semibold ${chat.avatarTextColor} flex-shrink-0`}>
+                                    <div className={`relative w-10 h-10 ${chat.avatarColor} rounded-full flex items-center justify-center mr-3 font-semibold ${chat.avatarTextColor} shrink-0`}>
                                         {chat.avatarText}
                                         {chat.unread && (
                                             <span className="absolute -bottom-0.5 -right-0.5 block h-3 w-3 bg-red-500 rounded-full border-2 border-white" />
@@ -154,7 +154,7 @@ export default function MessageWindow({ isOpen, onClose }) {
                                     <div className="flex-1 min-w-0"> 
                                         <div className="flex justify-between items-center">
                                             <span className="font-semibold text-sm truncate">{chat.contactName}</span>
-                                            <span className="text-xs text-gray-500 flex-shrink-0 ml-2">{chat.lastMessageDate}</span>
+                                            <span className="text-xs text-gray-500 shrink-0 ml-2">{chat.lastMessageDate}</span>
                                         </div>
                                         <p className={`text-sm text-gray-600 truncate ${chat.unread ? 'font-bold' : ''}`}>
                                             {chat.lastMessage}
@@ -162,7 +162,7 @@ export default function MessageWindow({ isOpen, onClose }) {
                                     </div>
 
                                     {/* Chevron Icon */}
-                                    <div className="ml-2 flex-shrink-0">
+                                    <div className="ml-2 shrink-0">
                                         {activeChatId === chat.id ? (
                                             <ChevronDownIcon className="text-gray-400 text-xs" />
                                         ) : (
@@ -179,7 +179,7 @@ export default function MessageWindow({ isOpen, onClose }) {
                                         <div className="space-y-3 mb-4 max-h-60 overflow-y-auto pr-2">
                                             {chat.fullHistory.map((msg, index) => (
                                                 <div key={index} className={`flex ${msg.sender === 'Me' ? 'justify-end' : 'justify-start'}`}>
-                                                    <div className={`p-2 rounded-lg max-w-[80%] ${msg.sender === 'Me' ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-800'}`}>
+                                                    <div className={`p-2 rounded-lg max-w-[80%] ${msg.sender === 'Me' ? 'bg-primary text-white' : 'bg-gray-200 text-gray-800'}`}>
                                                         <p className="text-sm whitespace-pre-wrap">{msg.message}</p>
                                                         <span className={`text-xs ${msg.sender === 'Me' ? 'text-blue-200' : 'text-gray-500'} block text-right mt-1`}>
                                                             {msg.timestamp}
@@ -196,7 +196,7 @@ export default function MessageWindow({ isOpen, onClose }) {
                                                 className="flex-1 p-2 bg-transparent focus:outline-none placeholder-gray-500 text-gray-800"
                                                 placeholder="Write a message..."
                                             />
-                                            <button className="flex-shrink-0 bg-blue-500 hover:bg-blue-600 text-white p-2 rounded-md transition-colors ml-2">
+                                            <button className="shrink-0 bg-primary hover:bg-secondary text-white p-2 rounded-md transition-colors ml-2">
                                                 <PaperPlaneIcon className="h-5 w-5" />
                                             </button>
                                         </div>
