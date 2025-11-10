@@ -18,8 +18,9 @@ import {
 } from 'react-icons/fa';
 
 import { useState } from 'react'
+import FileDetails from '../../pages/Resource/FileDetails';
 
-const ResourceCard = ({ type, size, size_unit, title }) => {
+const ResourceCard = ({ type, size, size_unit, title, onViewDetails }) => {
     const lowerType = type.toLowerCase();
     let Icon;
     let iconColor;
@@ -54,7 +55,18 @@ const ResourceCard = ({ type, size, size_unit, title }) => {
             break;
     }
 
+    const item = {
+        "title" : title,
+        "type" : type,
+        "size" : size,
+    }
+
     const [dropActive, setActive] = useState(false);
+
+    const handleViewClick = () => {
+        onViewDetails(item); // Tell the parent to open the modal
+        setActive(false);    // Close the dropdown
+    }
 
     return (
         <div className="relative group border border-gray-200 rounded-lg p-5 select-none cursor-pointer 
@@ -62,10 +74,10 @@ const ResourceCard = ({ type, size, size_unit, title }) => {
                         hover:scale-105
                         hover:border-gray-500
                         hover:z-10 "
+            onMouseLeave={() => setActive(false)}
         >
             {/* Action icons */}
             <div className="absolute hidden top-5 right-5 group-hover:flex items-center gap-3 text-gray-500">
-                <FaEye className="w-5 h-5 cursor-pointer hover:text-gray-800" />
                 <FaDownload className="w-5 h-5 cursor-pointer hover:text-gray-800" />
                 <FaShareAlt className="w-5 h-5 cursor-pointer hover:text-gray-800" />
                 <FaEllipsisV className="w-5 h-5 cursor-pointer hover:text-gray-800" onClick={() => setActive(!dropActive)} />
@@ -74,14 +86,14 @@ const ResourceCard = ({ type, size, size_unit, title }) => {
             {dropActive && 
                 <div 
                     className="absolute top-12 right-5 w-40 bg-white border border-gray-200 rounded-lg shadow-xl z-10"
-                    onMouseLeave={() => setActive(false)}
+                    
                 >
-                    <a href="#" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">View</a>
-                    <a href="#" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Download</a>
-                    <a href="#" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Rename</a>
-                    <a href="#" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Move</a>
-                    <a href="#" className="block px-4 py-2 text-sm text-red-600 hover:bg-gray-100">Delete</a>
-                    <a href="#" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Details</a>
+                    <button className="block w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" onClick={handleViewClick}>View</button>
+                    <button className="block w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Download</button>
+                    <button className="block w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Rename</button>
+                    <button className="block w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Move</button>
+                    <button className="block w-full px-4 py-2 text-sm text-red-600 hover:bg-gray-100">Delete</button>
+                    <button className="block w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Details</button>
                 </div>
             }
 
@@ -91,6 +103,7 @@ const ResourceCard = ({ type, size, size_unit, title }) => {
                 <p className="text-xs text-gray-500">Folder</p> :
                 <p className="text-xs text-gray-500">{size} {size_unit}</p>
             }
+            
         </div>
     )
 }

@@ -1,7 +1,11 @@
 import Header from "../../components/header/Header";
 import Footer from "../../components/footer/Footer";
 import ResourceCard from "../../components/resource/ResourceCard";
+import FileDetails from "./FileDetails";
+import FolderCard from "../../components/resource/FolderCard";
 import { Link, useNavigate } from "react-router-dom";
+import { useState } from "react";
+
 import {
     FaRegCommentDots,
     FaSearch,
@@ -90,6 +94,72 @@ const PrivateStorage = () => {
     const totalStorage = 300.00;
     const storagePercentage = (storageUsed / totalStorage) * 100;
 
+
+    // ------------ STATE DECLARATIONS ---------------------
+    const [selectedItem, setSelectedItem] = useState(null);
+    const [isNewFolder, toggleIsNewFolder] = useState(false);
+    const [itemList, setItemList] = useState(sampleFiles);
+    const [searchQuery, setSearchQuery] = useState("");
+
+
+    // ------------ VIEW DETAILS ----------
+    const handleViewDetails = (item) => {
+        setSelectedItem(item);
+    };
+
+    const handleCloseModal = () => {
+        setSelectedItem(null);
+    };
+
+    // ------------ CREATE FOLDERS -------------
+    const handleCreateFolder = (folderName) => {
+        const folder = {
+            "title" : folderName,
+            "type": "folder",
+            "size": null,
+            "size_unit": null
+        }
+        itemList.push(folder)
+        setItemList(itemList)
+        toggleIsNewFolder(false)
+    }
+
+
+    // ------------ SORT FILES ------------------------------
+    const sortFiles = (fileList) => {
+        const sortedList = [...fileList]; 
+        
+        sortedList.sort((a, b) => {
+            // 1. Type sort
+            if (a.type === 'folder' && b.type !== 'folder') {
+                return -1; 
+            }
+            if (a.type !== 'folder' && b.type === 'folder') {
+                return 1; 
+            }
+
+            // 2. Alphabetical sort
+            return a.title.localeCompare(b.title);
+        });
+        return sortedList;
+    };
+
+    const handleSortList = () => {
+        setItemList(prevList => {
+            return sortFiles(prevList);
+        })
+    }
+
+    // ------------ SEARCH FILES ------------------------------
+    const handleSearchChange = (e) => {
+        setSearchQuery(e.target.value);
+    }
+    const filteredItems = itemList.filter(item => 
+        item.title.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+
+
+
     return (
         <div className="">
             <Header />
@@ -152,7 +222,9 @@ const PrivateStorage = () => {
                             <input
                                 type="search"
                                 placeholder="Search Files..."
-                                className="pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg text-sm w-full md:w-80 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                className="pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg text-sm w-full md:w-80 focus:outline-none focus:ring-2 focus:ring-primary"
+                                value={searchQuery}
+                                onChange={handleSearchChange}
                             />
                         </div>
                         <div className="flex items-center gap-3">
@@ -160,12 +232,22 @@ const PrivateStorage = () => {
                                 <FaFilter className="w-5 h-5" />
                                 Filter
                             </button>
-                            <button className="flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-white bg-primary rounded-lg cursor-pointer hover:bg-secondary">
+                            <button className="flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-white bg-primary rounded-lg cursor-pointer hover:bg-secondary"
+                                    onClick={() => toggleIsNewFolder(true)}
+                            >
                                 <FaFolderPlus className="w-5 h-5" />
                                 New Folder
                             </button>
+                            {isNewFolder && (
+                                <FolderCard
+                                    onCreate={handleCreateFolder}
+                                    onCancel={toggleIsNewFolder}
+                                />
+                            )}
+
                             <div className="flex items-center gap-1 ml-2">
-                                <button className="p-2 text-gray-500 rounded-lg cursor-pointer hover:bg-gray-100">
+                                <button className="p-2 text-gray-500 rounded-lg cursor-pointer hover:bg-gray-100"
+                                        onClick={() => handleSortList()}>
                                     <FaBars className="w-6 h-6" />
                                 </button>
                                 <button className="p-2 text-primary cursor-pointer bg-gray-100 rounded-lg">
@@ -190,11 +272,31 @@ const PrivateStorage = () => {
 
                     {/* ---- 6. File Grid ---- */}
                     <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-                        {sampleFiles.map((item, index) => {
-                            return <ResourceCard key={index} type={item.type} size={item.size} size_unit={item.size_unit} title={item.title} />
-                        })}
-                        
+                        {/* Map filtered itemList */}
+                        {filteredItems.map((item) => (
+                            <ResourceCard 
+                                key={item.id} 
+                                type={item.type} 
+                                size={item.size} 
+                                size_unit={item.size_unit} 
+                                title={item.title} 
+                                onViewDetails={handleViewDetails}
+                            />
+                        ))}
 
+                        {/* Search not found*/}
+                        {filteredItems.length === 0 && !isNewFolder && (
+                            <p className="text-gray-500 col-span-full text-center py-8">
+                                Could not find the item "{searchQuery}".
+                            </p>
+                        )}
+                        {selectedItem && (
+                            <FileDetails 
+                                file={selectedItem} 
+                                comments={selectedItem.comments || []}
+                                onClose={handleCloseModal} // This prop is now correct
+                            />
+                        )}
                     </section>
 
                     {/* ---- 7. Footer Actions ---- */}

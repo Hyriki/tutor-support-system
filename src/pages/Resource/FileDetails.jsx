@@ -60,7 +60,7 @@ export default function FileDetails({ file = sampleFile, comments = sampleCommen
     return (
         // Modal Overlay
         <div>
-            <div className="fixed inset-0 z-10 flex items-center justify-cente bg-opacity-50 backdrop-blur-sm">
+            <div className="fixed inset-0 z-10 flex items-center justify-center bg-black/20">
                 
                 {/* Modal Content */}
                 <div className="relative w-full max-w-6xl p-6 bg-white rounded-lg shadow-xl m-8">
