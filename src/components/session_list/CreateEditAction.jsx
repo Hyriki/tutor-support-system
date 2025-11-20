@@ -106,14 +106,14 @@ export default function CreateEditAction({ sessions, setSessions, selectedSessio
           <input
             type="date"
             value={date}
-            onChange={(e) => setTitle(e.target.value)}
+            onChange={(e) => setDate(e.target.value)}
             className="border rounded-md px-2 py-1 mr-5"
           />
           <input
             type="time"
             step="3600" // 60 min
             value={startTime}
-            onChange={(e) => setTitle(e.target.value)}
+            onChange={(e) => setStartTime(e.target.value)}
             className="border rounded-md px-2 py-1"
           />
           <span>–</span>
@@ -121,7 +121,7 @@ export default function CreateEditAction({ sessions, setSessions, selectedSessio
             type="time"
             step="3600"
             value={endTime}
-            onChange={(e) => setTitle(e.target.value)}
+            onChange={(e) => setEndTime(e.target.value)}
             className="border rounded-md px-2 py-1"
           />
         </div>
@@ -151,7 +151,7 @@ export default function CreateEditAction({ sessions, setSessions, selectedSessio
             type="text"
             placeholder="Add location"
             value={location}
-            onChange={(e) => setTitle(e.target.value)}
+            onChange={(e) => setLocation(e.target.value)}
             className="border rounded-md px-2 py-1"
           />
         </div>
@@ -163,7 +163,7 @@ export default function CreateEditAction({ sessions, setSessions, selectedSessio
             type="number"
             placeholder="Set max students"
             value={maxStudents}
-            onChange={(e) => setTitle(e.target.value)}
+            onChange={(e) => setMaxStudents(e.target.value)}
             className="border rounded-md px-2 py-1"
           />
         </div>
@@ -174,7 +174,7 @@ export default function CreateEditAction({ sessions, setSessions, selectedSessio
           <textarea
             placeholder="Add description"
             value={description}
-            onChange={(e) => setTitle(e.target.value)}
+            onChange={(e) => setDescription(e.target.value)}
             className="w-full border rounded-md p-2 mb-2"
             rows={3}
           ></textarea>
