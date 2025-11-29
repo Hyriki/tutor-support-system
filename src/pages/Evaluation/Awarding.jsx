@@ -17,7 +17,7 @@ const mockStudentList = [
   { id: '2352435', name: 'Johnny Depp', scholarship: 0, credit: 95, creditChange: 7, class: 'CC02' },
 ];
 
-const MyTestPage = () => {
+const Awarding = () => {
   // Create hook navigate
   const navigate = useNavigate();
 
@@ -106,4 +106,4 @@ const MyTestPage = () => {
   );
 };
 
-export default MyTestPage;
+export default Awarding;

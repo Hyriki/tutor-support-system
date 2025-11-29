@@ -10,7 +10,7 @@ import FormSelect from '../../components/evaluation/Form/FormSelect';
 import ProfileSection from '../../components/evaluation/Profile/ProfileSection';
 import AvatarUploader from '../../components/evaluation/Profile/AvatarUploader';
 
-const StudentProfilePage = () => {
+const RecordStudentProgress = () => {
   const { studentId } = useParams();
 
   // Dữ liệu hard-code
@@ -162,4 +162,4 @@ const StudentProfilePage = () => {
   );
 };
 
-export default StudentProfilePage;
+export default RecordStudentProgress;
