@@ -3,7 +3,13 @@ import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { 
     FaSearch, FaChevronDown, FaBars, FaTimes, FaEnvelope,
     FaSignInAlt, FaUserPlus, FaUser, FaShoppingCart, FaCog,
-    FaIdCard, FaSignOutAlt, FaFolder
+    FaIdCard, FaSignOutAlt, FaFolder,
+    FaTrophy, FaAward,           // For Awarding
+    FaChartBar, FaChartLine,FaChartPie,     // For Analyze
+    FaPen, FaEdit, FaStar,       // For Write Review
+    FaClipboardList,              // For Review (form)
+    FaUserGraduate, FaUserCircle,  // For Student Profile
+    FaSlidersH, FaCogs, FaProjectDiagram    // For Optimize Resource
 } from 'react-icons/fa';
 // --- React Icons ---
 
@@ -292,6 +298,61 @@ export default function Header() {
                             className="flex items-center gap-2 px-4 py-2 hover:bg-gray-100 w-full text-left"
                             >
                             <FaFolder className="h-5 w-5" /> Private Storage
+                            </button>
+                        </li>
+                        <li>
+                            <button
+                            onClick={() => {
+                                navigate('/awarding');
+                                setShowUserMenu(false);
+                            }}
+                            className="flex items-center gap-2 px-4 py-2 hover:bg-gray-100 w-full text-left"
+                            >
+                            <FaTrophy className="h-5 w-5" /> Awarding
+                            </button>
+                        </li>
+                        <li>
+                            <button
+                            onClick={() => {
+                                navigate('/student-progress/:studentId');
+                                setShowUserMenu(false);
+                            }}
+                            className="flex items-center gap-2 px-4 py-2 hover:bg-gray-100 w-full text-left"
+                            >
+                            <FaIdCard className="h-5 w-5" /> Student Profile Page
+                            </button>
+                        </li>
+                        <li>
+                            <button
+                            onClick={() => {
+                                navigate('/analyze');
+                                setShowUserMenu(false);
+                            }}
+                            className="flex items-center gap-2 px-4 py-2 hover:bg-gray-100 w-full text-left"
+                            >
+                            <FaChartPie className="h-5 w-5" /> Analyze Data
+                            </button>
+                        </li>
+                        <li>
+                            <button
+                            onClick={() => {
+                                navigate('/optimize');
+                                setShowUserMenu(false);
+                            }}
+                            className="flex items-center gap-2 px-4 py-2 hover:bg-gray-100 w-full text-left"
+                            >
+                            <FaChartBar className="h-5 w-5" /> Optimize Resource
+                            </button>
+                        </li>
+                        <li>
+                            <button
+                            onClick={() => {
+                                navigate('/evaluation/:studentId');
+                                setShowUserMenu(false);
+                            }}
+                            className="flex items-center gap-2 px-4 py-2 hover:bg-gray-100 w-full text-left"
+                            >
+                            <FaClipboardList className="h-5 w-5" /> Write Evaluation
                             </button>
                         </li>
 
