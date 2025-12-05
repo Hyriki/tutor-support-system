@@ -14,13 +14,18 @@ import {
     FaEye,
     FaDownload,
     FaShareAlt,
-    FaFile 
+    FaFile,
+    FaFileWord,
+    FaFileExcel,
+    FaFileArchive,
+    FaFileCode,
+    FaFileAlt
 } from 'react-icons/fa';
 
 import { useState } from 'react'
 import FileDetails from '../../pages/Resource/FileDetails';
 
-const ResourceCard = ({ type, size, size_unit, title, onViewDetails }) => {
+const ResourceCard = ({ id, type, size, size_unit, title, onViewDetails, onDownload, onDelete, onRename }) => {
     const lowerType = type.toLowerCase();
     let Icon;
     let iconColor;
@@ -33,19 +38,71 @@ const ResourceCard = ({ type, size, size_unit, title, onViewDetails }) => {
             Icon = FaFilePdf;
             iconColor = "text-orange-500";
             break;
-        // Group common video types
+        // Word documents
+        case "doc":
+        case "docx":
+            Icon = FaFileWord;
+            iconColor = "text-blue-600";
+            break;
+        // Excel spreadsheets
+        case "xls":
+        case "xlsx":
+            Icon = FaFileExcel;
+            iconColor = "text-green-600";
+            break;
+        // Compressed files
+        case "zip":
+        case "rar":
+        case "7z":
+        case "tar":
+        case "gz":
+            Icon = FaFileArchive;
+            iconColor = "text-yellow-600";
+            break;
+        // Code files
+        case "js":
+        case "ts":
+        case "tsx":
+        case "jsx":
+        case "py":
+        case "java":
+        case "cpp":
+        case "c":
+        case "html":
+        case "css":
+        case "json":
+        case "xml":
+        case "yaml":
+        case "yml":
+            Icon = FaFileCode;
+            iconColor = "text-gray-700";
+            break;
+        // Text files
+        case "txt":
+        case "md":
+        case "csv":
+        case "log":
+            Icon = FaFileAlt;
+            iconColor = "text-gray-600";
+            break;
+        // Video types
         case "mp4":
         case "mov":
         case "avi":
+        case "mkv":
+        case "flv":
+        case "wmv":
             Icon = FaFileVideo;
             iconColor = "text-purple-500";
             break;
-        // Group common image types
+        // Image types
         case "jpg":
         case "jpeg":
         case "png":
         case "svg":
         case "gif":
+        case "webp":
+        case "ico":
             Icon = FaFileImage;
             iconColor = "text-green-500";
             break;
@@ -56,9 +113,11 @@ const ResourceCard = ({ type, size, size_unit, title, onViewDetails }) => {
     }
 
     const item = {
+        id,
         "title" : title,
         "type" : type,
         "size" : size,
+        "size_unit": size_unit,
     }
 
     const [dropActive, setActive] = useState(false);
@@ -66,6 +125,25 @@ const ResourceCard = ({ type, size, size_unit, title, onViewDetails }) => {
     const handleViewClick = () => {
         onViewDetails(item); // Tell the parent to open the modal
         setActive(false);    // Close the dropdown
+    }
+    const handleDownload = () => {
+        onDownload(item);
+        setActive(false);
+    }
+    const handleDelete = () => {
+        if (onDelete) {
+            const ok = window.confirm(`Delete "${title}"?`);
+            if (ok) onDelete(id);
+        }
+        setActive(false);
+    }
+    const handleRename = () => {
+        if (!onRename) return;
+        const next = window.prompt("Rename to:", title);
+        if (next && next.trim()) {
+            onRename(id, next.trim());
+        }
+        setActive(false);
     }
 
     return (
@@ -78,7 +156,7 @@ const ResourceCard = ({ type, size, size_unit, title, onViewDetails }) => {
         >
             {/* Action icons */}
             <div className="absolute hidden top-5 right-5 group-hover:flex items-center gap-3 text-gray-500">
-                <FaDownload className="w-5 h-5 cursor-pointer hover:text-gray-800" />
+                <FaDownload className="w-5 h-5 cursor-pointer hover:text-gray-800" onClick={handleDownload}/>
                 <FaShareAlt className="w-5 h-5 cursor-pointer hover:text-gray-800" />
                 <FaEllipsisV className="w-5 h-5 cursor-pointer hover:text-gray-800" onClick={() => setActive(!dropActive)} />
             </div>
@@ -89,11 +167,11 @@ const ResourceCard = ({ type, size, size_unit, title, onViewDetails }) => {
                     
                 >
                     <button className="block w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" onClick={handleViewClick}>View</button>
-                    <button className="block w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Download</button>
-                    <button className="block w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Rename</button>
+                    <button className="block w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" onClick={handleDownload}>Download</button>
+                    <button className="block w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" onClick={handleRename}>Rename</button>
                     <button className="block w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Move</button>
-                    <button className="block w-full px-4 py-2 text-sm text-red-600 hover:bg-gray-100">Delete</button>
-                    <button className="block w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Details</button>
+                    <button className="block w-full px-4 py-2 text-sm text-red-600 hover:bg-gray-100" onClick={handleDelete}>Delete</button>
+                    <button className="block w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" onClick={handleViewClick}>Details</button>
                 </div>
             }
 

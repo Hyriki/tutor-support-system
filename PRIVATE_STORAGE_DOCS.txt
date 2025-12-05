@@ -1,0 +1,823 @@
+================================================================================
+         PRIVATE STORAGE - TÀI LIỆU TỔNG HỢP VÀ HƯỚNG DẪN KỸ THUẬT
+================================================================================
+Ngày cập nhật: 6 tháng 12, 2025
+Dự án: Tutor Support System - Private Storage Module
+================================================================================
+
+I. TỔNG QUAN HỆ THỐNG
+================================================================================
+
+Hệ thống Private Storage là một giải pháp lưu trữ file hoàn toàn phía client
+(client-side) sử dụng localStorage của trình duyệt, không cần database hay
+server. Người dùng có thể upload, xem, tải xuống, quản lý files và folders.
+
+Tính năng chính:
+- Upload files với simulation progress bar
+- Lưu trữ files trong localStorage (tối đa ~5-10MB mỗi file)
+- Preview files: PDF, Word (DOCX), Images, Text files
+- Quản lý folders với nested structure (folders trong folders)
+- Download folders dưới dạng ZIP archive
+- Search, filter, sort files
+- Delete, rename files/folders
+- Deduplication (tránh trùng lặp files)
+- Quota management (giới hạn dung lượng)
+
+
+II. CẤU HÌNH VÀ GIỚI HẠN HỆ THỐNG
+================================================================================
+
+A. STORAGE LIMITS (Giới hạn lưu trữ)
+------------------------------------
+- Tổng dung lượng: 300 MB (totalStorage)
+- File tối đa mỗi lần upload: 200 MB
+- File tối đa cho localStorage: 20 MB
+  (Lớn hơn 20MB sẽ không lưu data URL vào localStorage)
+- localStorage browser limit: ~5-10 MB (tùy trình duyệt)
+
+B. STORAGE KEYS (Khóa lưu trữ trong localStorage)
+--------------------------------------------------
+1. tss_private_storage_items_v1
+   - Lưu danh sách metadata của tất cả files/folders
+   - Format: JSON array
+   - Ví dụ: [{id, title, type, size, size_unit, lastModified, parentId}, ...]
+
+2. tss_private_storage_usage_v1
+   - Lưu tổng dung lượng đã sử dụng (MB)
+   - Format: String number
+   - Ví dụ: "45.67"
+
+3. tss_file_data_[id]
+   - Lưu nội dung file dưới dạng data URL
+   - Mỗi file có một key riêng (không lưu chung trong 1 object)
+   - Format: data:mime/type;base64,iVBORw0KG...
+   - Ví dụ: tss_file_data_abc123xyz
+
+Lý do dùng individual keys (keys riêng):
+- Tránh QuotaExceededError khi lưu/parse object JSON lớn
+- Dễ dàng xóa file cụ thể mà không ảnh hưởng files khác
+- Cải thiện performance khi đọc/ghi
+
+
+III. CÁC THÀNH PHẦN CHÍNH (MAIN COMPONENTS)
+================================================================================
+
+A. PrivateStorage.jsx
+---------------------
+Component chính quản lý toàn bộ logic lưu trữ.
+
+State quan trọng:
+- itemList: Danh sách files/folders
+- storageUsed: Dung lượng đã dùng (MB)
+- uploadQueue: Danh sách files đang upload
+- currentFolderId: ID của folder hiện tại (null = root)
+- fileDataRef: Object chứa data URL của files trong memory
+- activeTab: "my-files" hoặc "recent"
+- filterType: "all", "images", "documents", "videos", "archives"
+
+Functions chính:
+1. saveSmallFileData(id, file, sizeMB)
+   - Lưu file vào localStorage (nếu <= 20MB)
+   - Trả về Promise (resolve/reject)
+   - Reject nếu QuotaExceededError
+
+2. handleFilesSelected(fileList)
+   - Xử lý khi user chọn files
+   - Simulation upload với progress bar
+   - Deduplication check
+   - Gọi saveSmallFileData sau khi upload xong
+
+3. handleDownloadFolder(folderId, folderName)
+   - Tạo ZIP archive từ files trong folder
+   - Sử dụng JSZip library
+
+4. handleViewDetails(item)
+   - Nếu là folder: Vào folder (setCurrentFolderId)
+   - Nếu là file: Mở modal preview
+
+B. FileDetails.jsx
+------------------
+Modal component để preview và xem thông tin file.
+
+Preview methods:
+1. PDF: Blob URL + iframe
+2. DOCX: mammoth.js (convert to HTML)
+3. Images: img tag với data URL
+4. Text files: iframe với data URL
+
+C. ResourceCard.jsx
+-------------------
+Card component hiển thị từng file/folder.
+
+Icons:
+- FaFolder: Folders
+- FaFilePdf: PDF files
+- FaFileWord: DOC/DOCX
+- FaFileExcel: XLS/XLSX
+- FaFileArchive: ZIP/RAR/7Z/TAR/GZ
+- FaFileCode: JS/TS/PY/HTML/CSS/JSON...
+- FaFileAlt: TXT/MD/CSV/LOG
+- FaFileVideo: MP4/MOV/AVI/MKV
+- FaFileImage: JPG/PNG/GIF/SVG
+- FaFile: Default
+
+
+IV. PACKAGES MỚI CÀI ĐẶT VÀ CÔNG DỤNG
+================================================================================
+
+A. JSZip (v3.10.1)
+------------------
+Library: jszip
+Công dụng: Tạo và giải nén file ZIP trong JavaScript
+
+Cách sử dụng trong project:
+```javascript
+import JSZip from "jszip";
+
+const zip = new JSZip();
+zip.file("hello.txt", "Hello World!");
+zip.generateAsync({ type: "blob" }).then(function(content) {
+    // Download ZIP file
+    saveAs(content, "example.zip");
+});
+```
+
+Trong Private Storage:
+- Tạo ZIP archive khi download folder
+- Convert data URL sang blob trước khi add vào ZIP
+- Lý do: data URL quá dài, blob hiệu quả hơn
+
+Ví dụ thực tế:
+```javascript
+const handleDownloadFolder = async (folderId, folderName) => {
+    const zip = new JSZip();
+    const filesInFolder = itemList.filter(i => i.parentId === folderId);
+    
+    for (const file of filesInFolder) {
+        const dataUrl = fileDataRef.current[file.id];
+        if (dataUrl) {
+            const blob = await fetch(dataUrl).then(r => r.blob());
+            zip.file(file.title, blob);
+        }
+    }
+    
+    const zipBlob = await zip.generateAsync({ type: "blob" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(zipBlob);
+    link.download = `${folderName}.zip`;
+    link.click();
+}
+```
+
+B. mammoth (v1.11.0)
+--------------------
+Library: mammoth
+Công dụng: Convert file Word (.docx) sang HTML
+
+Cách sử dụng:
+```javascript
+import mammoth from "mammoth";
+
+// Convert from ArrayBuffer
+mammoth.convertToHtml({ arrayBuffer: buffer })
+    .then(result => {
+        const html = result.value; // HTML content
+        const messages = result.messages; // Conversion warnings
+    });
+```
+
+Trong Private Storage:
+- Preview Word documents (.docx, .doc)
+- Convert data URL → blob → ArrayBuffer → HTML
+- Render HTML trong div với dangerouslySetInnerHTML
+
+Ví dụ thực tế:
+```javascript
+useEffect(() => {
+    if (dataUrl && ext === "docx") {
+        fetch(dataUrl)
+            .then(res => res.blob())
+            .then(blob => mammoth.convertToHtml({ arrayBuffer: blob }))
+            .then(result => {
+                setDocxContent(result.value);
+            });
+    }
+}, [dataUrl, ext]);
+
+// Render
+<div dangerouslySetInnerHTML={{ __html: docxContent }} />
+```
+
+C. pdfjs-dist (v5.4.449)
+------------------------
+Library: pdfjs-dist (Mozilla's PDF.js)
+Công dụng: Render PDF files trong canvas/SVG
+
+Trạng thái: ĐÃ CÀI NHƯNG KHÔNG DÙNG
+Lý do: Quá phức tạp cho preview đơn giản
+
+Thay thế: Dùng blob URL + iframe
+```javascript
+// Convert PDF data URL to blob URL
+useEffect(() => {
+    if (dataUrl && isPdf(ext)) {
+        fetch(dataUrl)
+            .then(res => res.blob())
+            .then(blob => {
+                const blobUrl = URL.createObjectURL(blob);
+                setPdfBlobUrl(blobUrl);
+            });
+    }
+    
+    return () => {
+        if (pdfBlobUrl) {
+            URL.revokeObjectURL(pdfBlobUrl); // Cleanup
+        }
+    };
+}, [dataUrl, ext]);
+
+// Render
+<iframe src={`${pdfBlobUrl}#toolbar=0`} />
+```
+
+
+V. KHÁI NIỆM KỸ THUẬT QUAN TRỌNG
+================================================================================
+
+A. DATA URL
+-----------
+Định nghĩa:
+- Cách nhúng dữ liệu file trực tiếp trong URL
+- Không cần file server riêng
+- Format: data:[MIME-type];base64,[base64-encoded-data]
+
+Ví dụ:
+```
+data:text/plain;base64,SGVsbG8gV29ybGQh
+data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAA...
+data:application/pdf;base64,JVBERi0xLjQKJeLj...
+```
+
+Ưu điểm:
+- Lưu trực tiếp trong localStorage
+- Không cần fetch từ server
+- Hoạt động offline
+
+Nhược điểm:
+- Kích thước lớn (~33% hơn file gốc do base64 encoding)
+- localStorage có giới hạn (~5-10MB)
+- Parse/stringify JSON chậm với data lớn
+
+Cách tạo data URL:
+```javascript
+const reader = new FileReader();
+reader.onload = (e) => {
+    const dataUrl = e.target.result;
+    // data:image/png;base64,iVBORw0KG...
+};
+reader.readAsDataURL(file);
+```
+
+B. BLOB (Binary Large Object)
+------------------------------
+Định nghĩa:
+- Object đại diện cho dữ liệu file dạng nhị phân
+- Immutable (không thay đổi được)
+- Có thể tạo object URL tạm thời
+
+Ví dụ tạo Blob:
+```javascript
+const blob = new Blob(["Hello World"], { type: "text/plain" });
+const blob2 = new Blob([arrayBuffer], { type: "application/pdf" });
+```
+
+Blob URL (Object URL):
+```javascript
+const blobUrl = URL.createObjectURL(blob);
+// blob:http://localhost:5173/abc-123-def-456
+
+// Sử dụng
+<iframe src={blobUrl} />
+
+// Cleanup khi không dùng nữa
+URL.revokeObjectURL(blobUrl);
+```
+
+So sánh Data URL vs Blob URL:
+| Đặc điểm          | Data URL                  | Blob URL                |
+|-------------------|---------------------------|-------------------------|
+| Kích thước        | Lớn (~133% file gốc)      | Nhỏ (chỉ reference)     |
+| Lưu trữ           | Có thể lưu localStorage   | Không lưu được          |
+| Lifetime          | Permanent                 | Chỉ trong session       |
+| Performance       | Chậm với file lớn         | Nhanh                   |
+| Sử dụng           | Lưu trữ lâu dài          | Preview/display tạm     |
+
+Khi nào dùng gì:
+- Data URL: Lưu vào localStorage, embed trong HTML/CSS
+- Blob URL: Preview PDF/images/videos, download files
+
+C. FILEREADER API
+-----------------
+API để đọc nội dung file từ <input type="file">
+
+Methods:
+1. readAsDataURL(file)
+   - Đọc file thành data URL (base64)
+   - Dùng để preview images hoặc lưu localStorage
+
+2. readAsText(file)
+   - Đọc file thành text
+   - Dùng cho .txt, .json, .csv
+
+3. readAsArrayBuffer(file)
+   - Đọc file thành ArrayBuffer
+   - Dùng cho binary processing (PDF, images)
+
+4. readAsBinaryString(file)
+   - Đọc file thành binary string (deprecated)
+
+Ví dụ sử dụng:
+```javascript
+const handleFileUpload = (file) => {
+    const reader = new FileReader();
+    
+    reader.onload = (e) => {
+        const result = e.target.result;
+        console.log(result); // Data URL hoặc text
+    };
+    
+    reader.onerror = (e) => {
+        console.error("Error reading file", e);
+    };
+    
+    reader.readAsDataURL(file); // Hoặc readAsText, readAsArrayBuffer
+};
+```
+
+D. LOCALSTORAGE
+---------------
+Web API để lưu trữ key-value pairs trong trình duyệt.
+
+Đặc điểm:
+- Lưu trữ vĩnh viễn (không mất khi đóng tab/browser)
+- Giới hạn: ~5-10 MB (tùy browser)
+- Chỉ lưu string (phải JSON.stringify/parse cho objects)
+- Đồng bộ (synchronous) - blocking
+- Same-origin policy (chỉ truy cập từ cùng domain)
+
+API Methods:
+```javascript
+// Set
+localStorage.setItem("key", "value");
+localStorage.setItem("user", JSON.stringify({ name: "John" }));
+
+// Get
+const value = localStorage.getItem("key");
+const user = JSON.parse(localStorage.getItem("user"));
+
+// Remove
+localStorage.removeItem("key");
+
+// Clear all
+localStorage.clear();
+
+// Check existence
+if (localStorage.getItem("key") !== null) {
+    // Key exists
+}
+```
+
+Quota Exceeded Error:
+```javascript
+try {
+    localStorage.setItem("bigData", veryLargeString);
+} catch (e) {
+    if (e.name === "QuotaExceededError") {
+        console.error("localStorage is full!");
+    }
+}
+```
+
+Best Practices:
+1. Không lưu dữ liệu nhạy cảm (passwords, tokens)
+2. Compress data nếu có thể
+3. Dùng individual keys thay vì 1 object lớn
+4. Cleanup old data định kỳ
+5. Handle QuotaExceededError gracefully
+
+E. PROMISE
+----------
+Object đại diện cho kết quả của một async operation.
+
+States:
+- Pending: Đang chờ
+- Fulfilled: Thành công (resolved)
+- Rejected: Thất bại
+
+Syntax:
+```javascript
+const promise = new Promise((resolve, reject) => {
+    // Async operation
+    if (success) {
+        resolve(result);
+    } else {
+        reject(error);
+    }
+});
+
+// Sử dụng
+promise
+    .then(result => {
+        console.log("Success:", result);
+    })
+    .catch(error => {
+        console.error("Error:", error);
+    });
+```
+
+Trong Private Storage:
+```javascript
+const saveSmallFileData = (id, file, sizeMB) => {
+    return new Promise((resolve, reject) => {
+        if (sizeMB > 20) {
+            resolve(false); // Too large, skip save
+            return;
+        }
+        
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            try {
+                const dataUrl = e.target.result;
+                const key = `${STORAGE_FILEDATA_PREFIX}${id}`;
+                localStorage.setItem(key, dataUrl);
+                fileDataRef.current[id] = dataUrl;
+                resolve(true);
+            } catch (err) {
+                if (err.name === "QuotaExceededError") {
+                    reject(new Error(`Storage full! Cannot save "${file.name}"`));
+                }
+            }
+        };
+        reader.readAsDataURL(file);
+    });
+};
+
+// Sử dụng
+saveSmallFileData(id, file, sizeMB)
+    .then(saved => {
+        if (saved) {
+            // Add to itemList
+        }
+    })
+    .catch(error => {
+        alert(error.message);
+    });
+```
+
+F. ASYNC/AWAIT
+--------------
+Syntax sugar cho Promises, code dễ đọc hơn.
+
+```javascript
+// Dùng Promise
+function getData() {
+    return fetch(url)
+        .then(res => res.json())
+        .then(data => {
+            console.log(data);
+            return data;
+        })
+        .catch(error => {
+            console.error(error);
+        });
+}
+
+// Dùng async/await
+async function getData() {
+    try {
+        const res = await fetch(url);
+        const data = await res.json();
+        console.log(data);
+        return data;
+    } catch (error) {
+        console.error(error);
+    }
+}
+```
+
+Trong Private Storage:
+```javascript
+const handleDownloadFolder = async (folderId, folderName) => {
+    const zip = new JSZip();
+    const filesInFolder = itemList.filter(i => i.parentId === folderId);
+    
+    for (const file of filesInFolder) {
+        const dataUrl = fileDataRef.current[file.id];
+        if (dataUrl) {
+            // await để chờ fetch hoàn thành
+            const blob = await fetch(dataUrl).then(r => r.blob());
+            zip.file(file.title, blob);
+        }
+    }
+    
+    const zipBlob = await zip.generateAsync({ type: "blob" });
+    // ... download
+}
+```
+
+
+VI. LUỒNG XỬ LÝ CHÍNH (MAIN WORKFLOWS)
+================================================================================
+
+A. UPLOAD FILE WORKFLOW
+-----------------------
+1. User chọn files (drag-drop hoặc file picker)
+2. handleFilesSelected(fileList) được gọi
+3. Validate:
+   - Check file size <= 200MB
+   - Check available storage space
+4. Deduplication check (title + size)
+5. Tạo upload queue với progress simulation
+6. Upload interval (fake progress 0% → 100%)
+7. Khi đạt 100%:
+   - Gọi saveSmallFileData() → Promise
+   - Nếu resolve(true): Add to itemList
+   - Nếu reject: Show error, không add
+8. Update storageUsed
+9. Persist to localStorage
+
+B. PREVIEW FILE WORKFLOW
+-------------------------
+1. User click vào file card
+2. handleViewDetails(item) được gọi
+3. Lấy dataUrl từ fileDataRef.current[item.id]
+4. Mở FileDetails modal
+5. Render preview:
+   - PDF: data URL → blob → blob URL → iframe
+   - DOCX: data URL → blob → mammoth → HTML
+   - Image: data URL → img tag
+   - Text: data URL → iframe
+6. User download/print/close
+
+C. DOWNLOAD FOLDER WORKFLOW
+----------------------------
+1. User click download button trên folder card
+2. handleDownloadFolder(folderId, folderName) được gọi
+3. Filter files trong folder (parentId === folderId)
+4. Tạo JSZip instance
+5. Loop qua files:
+   - Lấy dataUrl từ fileDataRef
+   - Convert to blob: await fetch(dataUrl).then(r => r.blob())
+   - Add to zip: zip.file(fileName, blob)
+6. Generate ZIP: await zip.generateAsync({ type: "blob" })
+7. Create download link với blob URL
+8. Trigger download
+9. Cleanup blob URL
+
+D. DELETE FILE WORKFLOW
+------------------------
+1. User click delete trong dropdown menu
+2. Confirm dialog
+3. handleDeleteItem(id) được gọi
+4. Filter itemList (remove item)
+5. Nếu là folder:
+   - Tìm tất cả files trong folder (parentId === folderId)
+   - Xóa từng file:
+     - Remove khỏi itemList
+     - Delete localStorage key: tss_file_data_[fileId]
+     - Delete from fileDataRef
+     - Update storageUsed
+6. Nếu là file:
+   - Remove khỏi itemList
+   - Delete localStorage key
+   - Delete from fileDataRef
+   - Update storageUsed
+7. Persist changes
+
+
+VII. DEBUGGING VÀ TROUBLESHOOTING
+================================================================================
+
+A. COMMON ERRORS
+----------------
+
+1. QuotaExceededError
+   Nguyên nhân: localStorage đầy (~5-10MB)
+   Giải pháp:
+   - Giới hạn file size <= 20MB
+   - Dùng individual keys thay vì 1 object lớn
+   - Cleanup old files
+   - Try-catch khi setItem()
+   - Show error message, không add file vào list
+
+2. Blank PDF Preview
+   Nguyên nhân: 
+   - Data URL quá lớn trong iframe
+   - Browser không hỗ trợ PDF viewer
+   Giải pháp:
+   - Convert data URL → blob URL
+   - Dùng iframe với blob URL
+   - Add #toolbar=0 để ẩn toolbar
+
+3. DOCX Not Loading
+   Nguyên nhân:
+   - mammoth cần ArrayBuffer, không phải string
+   Giải pháp:
+   - fetch(dataUrl) → blob → pass to mammoth
+   - Use convertToHtml method
+   - Render HTML with dangerouslySetInnerHTML
+
+4. Duplicate Files
+   Nguyên nhân:
+   - Không có deduplication
+   - User upload cùng file nhiều lần
+   Giải pháp:
+   - Check id trùng
+   - Check signature: `${title}__${size}__${unit}`
+   - Filter trước khi add
+
+5. Files Show But Can't Download
+   Nguyên nhân:
+   - File metadata tồn tại nhưng data không save được
+   - QuotaExceededError xảy ra sau khi add to itemList
+   Giải pháp:
+   - Save data TRƯỚC khi add to itemList
+   - Check Promise resolve/reject
+   - Only add if save successful
+
+B. DEBUGGING TIPS
+------------------
+
+1. Check localStorage usage:
+```javascript
+const getTotalSize = () => {
+    let total = 0;
+    for (let key in localStorage) {
+        if (localStorage.hasOwnProperty(key)) {
+            total += localStorage[key].length + key.length;
+        }
+    }
+    return (total / 1024 / 1024).toFixed(2) + ' MB';
+};
+console.log('localStorage size:', getTotalSize());
+```
+
+2. List all storage keys:
+```javascript
+console.log('All keys:', Object.keys(localStorage));
+console.log('File data keys:', 
+    Object.keys(localStorage).filter(k => k.startsWith('tss_file_data_'))
+);
+```
+
+3. Check data URL size:
+```javascript
+const dataUrl = localStorage.getItem('tss_file_data_abc123');
+if (dataUrl) {
+    console.log('Data URL size:', (dataUrl.length / 1024).toFixed(2) + ' KB');
+}
+```
+
+4. Monitor upload queue:
+```javascript
+useEffect(() => {
+    console.log('Upload queue:', uploadQueue);
+}, [uploadQueue]);
+```
+
+5. Check file save status:
+```javascript
+saveSmallFileData(id, file, sizeMB)
+    .then(saved => {
+        console.log(`File ${file.name} saved:`, saved);
+    })
+    .catch(error => {
+        console.error(`File ${file.name} failed:`, error);
+    });
+```
+
+
+VIII. PERFORMANCE OPTIMIZATION
+================================================================================
+
+A. BEST PRACTICES IMPLEMENTED
+------------------------------
+
+1. Individual Storage Keys
+   - Tránh parse/stringify object lớn
+   - Xóa file nhanh hơn
+   - Giảm memory usage
+
+2. Blob URL for Preview
+   - Nhanh hơn data URL
+   - Ít memory hơn
+   - Cleanup khi unmount
+
+3. Deduplication
+   - Tránh lưu trùng file
+   - Kiểm tra ở load time và insert time
+
+4. Progress Simulation
+   - UX tốt hơn
+   - Không block UI
+   - Interval cleanup
+
+5. Promise-based Save
+   - Async operations
+   - Error handling
+   - Conditional add to list
+
+B. FUTURE IMPROVEMENTS
+----------------------
+
+1. IndexedDB
+   - Dung lượng lớn hơn (>100MB)
+   - Async API
+   - Better for binary data
+   
+2. Compression
+   - Compress files trước khi lưu
+   - pako.js for gzip
+   - Giảm storage usage
+
+3. Chunking
+   - Chia file lớn thành chunks
+   - Lưu từng chunk riêng
+   - Ghép lại khi cần
+
+4. Web Workers
+   - Process files trong background
+   - Không block main thread
+   - Better performance
+
+5. Service Worker
+   - Cache files
+   - Offline support
+   - Background sync
+
+
+IX. TÀI LIỆU THAM KHẢO
+================================================================================
+
+Official Documentation:
+- JSZip: https://stuk.github.io/jszip/
+- mammoth.js: https://github.com/mwilliamson/mammoth.js
+- PDF.js: https://mozilla.github.io/pdf.js/
+- FileReader API: https://developer.mozilla.org/en-US/docs/Web/API/FileReader
+- localStorage: https://developer.mozilla.org/en-US/docs/Web/API/Window/localStorage
+- Blob: https://developer.mozilla.org/en-US/docs/Web/API/Blob
+- URL.createObjectURL: https://developer.mozilla.org/en-US/docs/Web/API/URL/createObjectURL
+
+React Documentation:
+- Hooks: https://react.dev/reference/react
+- useEffect: https://react.dev/reference/react/useEffect
+- useRef: https://react.dev/reference/react/useRef
+
+Browser Compatibility:
+- Can I Use localStorage: https://caniuse.com/namevalue-storage
+- Can I Use FileReader: https://caniuse.com/filereader
+
+
+X. CHANGELOG (LỊCH SỬ THAY ĐỔI)
+================================================================================
+
+Version 1.0 (Initial):
+- Upload simulation với fake progress
+- Sample files seed data
+- Basic preview
+
+Version 1.1:
+- Client-side storage với localStorage
+- File data persistence
+- Deduplication
+
+Version 1.2:
+- File preview: PDF, images, text
+- FileDetails modal
+
+Version 1.3:
+- Folder navigation system
+- Nested folders (parentId)
+- Breadcrumb navigation
+
+Version 1.4:
+- Folder download as ZIP (JSZip)
+- Data URL to blob conversion
+
+Version 1.5:
+- DOCX preview (mammoth.js)
+- Word document support
+
+Version 1.6:
+- Individual storage keys
+- QuotaExceededError handling
+- Promise-based save
+
+Version 1.7 (Current):
+- Removed sample files seed
+- Start with empty storage
+- Production-ready
+
+================================================================================
+                           KẾT THÚC TÀI LIỆU
+================================================================================

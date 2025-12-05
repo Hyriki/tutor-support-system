@@ -1,119 +1,214 @@
-import React, { useState } from 'react';
-import Header from '../../components/header/Header';
-import Footer from '../../components/footer/Footer';
-import { 
-    FaTimes, 
-    FaDownload, 
-    FaPrint, 
-    FaChevronLeft, 
-    FaChevronRight 
-} from 'react-icons/fa';
-
-// --- Sample Data (You would pass this in as props) ---
+import React, { useMemo, useState, useEffect } from "react";
+import mammoth from "mammoth";
+import {
+    FaTimes,
+    FaDownload,
+    FaPrint,
+    FaChevronLeft,
+    FaChevronRight
+} from "react-icons/fa";
 
 const sampleFile = {
     title: "SE - CHAPTER 6",
-    type: "PDF Document",
+    type: "pdf",
     size: "2.5 MB",
     lastModified: "2024-07-25 10:30 AM",
-    totalPages: 5,
-    // A placeholder for the preview image
-    previewUrl: "https://i.imgur.com/bWSIKk8.png" 
+    totalPages: 1,
+    previewUrl: "https://i.imgur.com/bWSIKk8.png"
 };
 
 const sampleComments = [
-    {
-        id: 1,
-        author: "John Doe",
-        timestamp: "2 hours ago",
-        text: "This has some nice notes!",
-        isOnline: true
-    },
-    {
-        id: 2,
-        author: "Jane Doe",
-        timestamp: "1 day ago",
-        text: "Love the lessons!",
-        isOnline: false
-    }
+    { id: 1, author: "John Doe", timestamp: "2 hours ago", text: "This has some nice notes!", isOnline: true },
+    { id: 2, author: "Jane Doe", timestamp: "1 day ago", text: "Love the lessons!", isOnline: false }
 ];
 
-// --- The Main Component ---
+const isImage = (ext) => ["jpg", "jpeg", "png", "gif", "svg", "webp"].includes(ext);
+const isPdf = (ext) => ext === "pdf";
+const isTextLike = (ext) => ["txt", "md", "json", "js", "ts", "tsx", "csv", "log"].includes(ext);
+const isDocLike = (ext) => ["doc", "docx", "xls", "xlsx", "ppt", "pptx"].includes(ext);
 
-export default function FileDetails({ file = sampleFile, comments = sampleComments, onClose }) {
+const getExt = (file) => {
+    if (!file) return "";
+    if (file.type && !file.type.includes(" ") && file.type.indexOf('/') === -1) return file.type.toLowerCase();
+    if (file.title && file.title.includes('.')) {
+        return file.title.split('.').pop().toLowerCase();
+    }
+    return "";
+};
+
+export default function FileDetails({ file = sampleFile, onClose, onDownload }) {
+    const ext = useMemo(() => getExt(file), [file]);
+    const title = file?.title || "Untitled";
+    const size = file?.size || "";
+    const sizeUnit = file?.size_unit || "MB";
+    const lastModified = file?.lastModified || "";
+    const dataUrl = file?.dataUrl || file?.previewUrl || "";
+    const totalPages = file?.totalPages || 1;
     
-    const [currentPage, setCurrentPage] = useState(1);
-    const [newComment, setNewComment] = useState("");
+    const [docxContent, setDocxContent] = useState(null);
+    const [docxLoading, setDocxLoading] = useState(false);
+    const [pdfBlobUrl, setPdfBlobUrl] = useState(null);
 
-    const handlePostComment = () => {
-        if (newComment.trim()) {
-            // Add your comment posting logic here
-            console.log("Posting comment:", newComment);
-            setNewComment("");
+    // Convert DOCX to HTML using mammoth
+    useEffect(() => {
+        if (dataUrl && (ext === "docx" || ext === "doc")) {
+            setDocxLoading(true);
+            // Convert data URL to blob
+            fetch(dataUrl)
+                .then(res => res.blob())
+                .then(blob => {
+                    return mammoth.convertToHtml({ arrayBuffer: blob });
+                })
+                .then(result => {
+                    setDocxContent(result.value);
+                    setDocxLoading(false);
+                })
+                .catch(err => {
+                    console.error("Error converting DOCX:", err);
+                    setDocxLoading(false);
+                });
         }
+    }, [dataUrl, ext]);
+
+    // Convert PDF data URL to blob URL for better iframe compatibility
+    useEffect(() => {
+        if (dataUrl && isPdf(ext)) {
+            fetch(dataUrl)
+                .then(res => res.blob())
+                .then(blob => {
+                    const blobUrl = URL.createObjectURL(blob);
+                    setPdfBlobUrl(blobUrl);
+                })
+                .catch(err => {
+                    console.error("Error creating PDF blob:", err);
+                });
+        }
+        
+        // Cleanup blob URL when component unmounts
+        return () => {
+            if (pdfBlobUrl) {
+                URL.revokeObjectURL(pdfBlobUrl);
+            }
+        };
+    }, [dataUrl, ext]);
+
+    const renderPreview = () => {
+        if (dataUrl && isPdf(ext)) {
+            if (!pdfBlobUrl) {
+                return (
+                    <div className="text-center text-gray-600 text-sm p-8">
+                        Loading PDF...
+                    </div>
+                );
+            }
+            return (
+                <iframe 
+                    src={`${pdfBlobUrl}#toolbar=0`}
+                    title="PDF preview" 
+                    className="w-full h-[60vh] rounded-md border bg-white"
+                    style={{ border: 'none' }}
+                />
+            );
+        }
+        if (dataUrl && isImage(ext)) {
+            return (
+                <img src={dataUrl} alt="File preview" className="object-contain max-h-[60vh] w-full rounded-md border shadow-sm bg-white" />
+            );
+        }
+        if (dataUrl && isTextLike(ext)) {
+            return (
+                <iframe src={dataUrl} title="Text preview" className="w-full h-[60vh] rounded-md border bg-white" />
+            );
+        }
+        if (dataUrl && (ext === "docx" || ext === "doc")) {
+            if (docxLoading) {
+                return (
+                    <div className="text-center text-gray-600 text-sm p-8">
+                        Loading Word document...
+                    </div>
+                );
+            }
+            if (docxContent) {
+                return (
+                    <div 
+                        className="w-full h-[60vh] rounded-md border bg-white p-6 overflow-auto prose prose-sm max-w-none"
+                        dangerouslySetInnerHTML={{ __html: docxContent }}
+                    />
+                );
+            }
+            return (
+                <div className="text-center text-gray-600 text-sm">
+                    Could not preview Word document. Please download to open.
+                </div>
+            );
+        }
+        if (isDocLike(ext)) {
+            return (
+                <div className="text-center text-gray-600 text-sm">
+                    Preview for Word/Excel/PowerPoint is not available offline. Please download to open locally.
+                </div>
+            );
+        }
+        if (dataUrl) {
+            return (
+                <iframe src={dataUrl} title="File preview" className="w-full h-[60vh] rounded-md border bg-white" />
+            );
+        }
+        return (
+            <div className="text-center text-gray-500 text-sm">No preview available. Try downloading the file.</div>
+        );
     };
 
-    const handleChangePage = (amount) => {
-        setCurrentPage(prev => Math.max(1, prev + amount))
-    }
+    const handleDownload = () => {
+        if (dataUrl) {
+            const link = document.createElement("a");
+            link.href = dataUrl;
+            link.download = title;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            return;
+        }
+        if (onDownload) onDownload(file);
+    };
 
     return (
-        // Modal Overlay
         <div>
             <div className="fixed inset-0 z-10 flex items-center justify-center bg-black/20">
-                
-                {/* Modal Content */}
                 <div className="relative w-full max-w-6xl p-6 bg-white rounded-lg shadow-xl m-8">
-                    
-                    {/* --- Header --- */}
                     <div className="flex items-start justify-between pb-4 border-b">
                         <div>
-                            <h2 className="text-2xl font-bold text-gray-800">{file.title}</h2>
+                            <h2 className="text-2xl font-bold text-gray-800">{title}</h2>
                             <p className="text-sm text-gray-500">
-                                {file.type} | {file.size} | Last modified: {file.lastModified}
+                                {ext || file.type || "file"} {size ? `| ${size}` : ""} {lastModified ? `| Last modified: ${lastModified}` : ""}
                             </p>
                         </div>
                         <div className="flex items-center gap-4 text-gray-600">
-                            <FaDownload className="w-5 h-5 cursor-pointer hover:text-primary" title="Download" />
-                            <FaPrint className="w-5 h-5 cursor-pointer hover:text-primary" title="Print" />
-                            <FaTimes 
-                                className="w-6 h-6 cursor-pointer hover:text-red-500" 
-                                title="Close"
-                                onClick={onClose} 
-                            />
+                            <FaDownload className="w-5 h-5 cursor-pointer hover:text-primary" title="Download" onClick={handleDownload} />
+                            <FaPrint className="w-5 h-5 cursor-pointer hover:text-primary" title="Print" onClick={() => window.print()} />
+                            <FaTimes className="w-6 h-6 cursor-pointer hover:text-red-500" title="Close" onClick={onClose} />
                         </div>
                     </div>
 
-                    {/* --- Main Body (Viewer + Sidebar) --- */}
                     <div className="flex flex-col md:flex-row gap-6 pt-6">
-                        
-                        {/* Column 1: Document Viewer */}
                         <div className="grow bg-gray-100 rounded-lg p-4 flex flex-col justify-between">
-                            {/* Document Preview Area */}
                             <div className="grow flex items-center justify-center">
-                                {/* In a real app, this would be a <Document> from react-pdf or an <iframe> */}
-                                <img 
-                                    src={file.previewUrl} 
-                                    alt="File preview" 
-                                    className="object-contain max-h-[60vh] border rounded-md shadow-sm"
-                                />
+                                {renderPreview()}
                             </div>
-                            
-                            {/* Pagination */}
                             <div className="flex items-center justify-between p-4 bg-white rounded-md mt-4 shadow-inner">
-                                <button className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 disabled:opacity-50 disabled:cursor-default cursor-pointer"
-                                        onClick={() => handleChangePage(-1)}
-                                        disabled={currentPage === 1}
+                                <button 
+                                    className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 disabled:opacity-50 disabled:cursor-default cursor-pointer" 
+                                    disabled
                                 >
                                     <FaChevronLeft />
                                     Previous
                                 </button>
                                 <span className="text-sm text-gray-600">
-                                    Page <span className="font-semibold">{currentPage}</span> of {file.totalPages}
+                                    Page <span className="font-semibold">1</span> of {totalPages}
                                 </span>
-                                <button className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 disabled:opacity-50 disabled:cursor-default cursor-pointer"
-                                        onClick={() => handleChangePage(+1)}
-                                        disabled={currentPage === file.totalPages}
+                                <button 
+                                    className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 disabled:opacity-50 disabled:cursor-default cursor-pointer" 
+                                    disabled
                                 >
                                     Next
                                     <FaChevronRight />
@@ -121,71 +216,30 @@ export default function FileDetails({ file = sampleFile, comments = sampleCommen
                             </div>
                         </div>
 
-                        {/* Column 2: Sidebar (Info + Comments) */}
                         <div className="w-full md:w-80 lg:w-96 shrink-0 flex flex-col gap-6">
-                            
-                            {/* File Information Card */}
                             <div className="p-4 bg-gray-50 border rounded-lg">
                                 <h3 className="text-lg font-semibold text-gray-800 mb-3">File Information</h3>
-                                <div className="space-y-2 text-sm">
+                                <div className="space-y-3 text-sm">
+                                    <div className="flex justify-between">
+                                        <span className="text-gray-500">Name:</span>
+                                        <span className="font-medium text-gray-800 wrap-break-words text-right ml-2">{title}</span>
+                                    </div>
                                     <div className="flex justify-between">
                                         <span className="text-gray-500">Type:</span>
-                                        <span className="font-medium text-gray-800">{file.type}</span>
+                                        <span className="font-medium text-gray-800">{ext || file.type || "file"}</span>
                                     </div>
                                     <div className="flex justify-between">
                                         <span className="text-gray-500">Size:</span>
-                                        <span className="font-medium text-gray-800">{file.size}</span>
+                                        <span className="font-medium text-gray-800">{size} {sizeUnit || ""}</span>
                                     </div>
                                     <div className="flex justify-between">
-                                        <span className="text-gray-500">Last-Modified:</span>
-                                        <span className="font-medium text-gray-800">{file.lastModified}</span>
+                                        <span className="text-gray-500">Modified:</span>
+                                        <span className="font-medium text-gray-800">{lastModified || "—"}</span>
                                     </div>
-                                </div>
-                            </div>
-
-                            {/* Comments Card */}
-                            <div className="p-4 bg-gray-50 border rounded-lg grow flex flex-col">
-                                <h3 className="text-lg font-semibold text-gray-800 mb-4">Comments</h3>
-                                
-                                {/* Comment List */}
-                                <div className="grow space-y-4 max-h-64 overflow-y-auto mb-4 pr-2">
-                                    {comments.map((comment) => (
-                                        <div key={comment.id} className="flex gap-3">
-                                            <div className="relative">
-                                                <span className="flex items-center justify-center w-8 h-8 bg-primary text-white rounded-full font-semibold text-sm">
-                                                    {comment.author.charAt(0)}
-                                                </span>
-                                                <span 
-                                                    className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border border-white
-                                                        ${comment.isOnline ? 'bg-green-500' : 'bg-gray-400'}`}
-                                                ></span>
-                                            </div>
-                                            <div>
-                                                <div className="flex items-baseline gap-2">
-                                                    <span className="font-semibold text-sm">{comment.author}</span>
-                                                    <span className="text-xs text-gray-500">{comment.timestamp}</span>
-                                                </div>
-                                                <p className="text-sm text-gray-700">{comment.text}</p>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-
-                                {/* Add Comment Form */}
-                                <div className="mt-auto">
-                                    <textarea 
-                                        className="w-full p-2 border rounded-md text-sm"
-                                        rows="3"
-                                        placeholder="Add comments..."
-                                        value={newComment}
-                                        onChange={(e) => setNewComment(e.target.value)}
-                                    ></textarea>
-                                    <button 
-                                        className="w-full px-4 py-2 mt-2 font-semibold text-white bg-primary rounded-md hover:bg-secondary cursor-pointer"
-                                        onClick={handlePostComment}
-                                    >
-                                        POST COMMENTS
-                                    </button>
+                                    <div className="flex justify-between">
+                                        <span className="text-gray-500">Pages:</span>
+                                        <span className="font-medium text-gray-800">{totalPages}</span>
+                                    </div>
                                 </div>
                             </div>
                         </div>

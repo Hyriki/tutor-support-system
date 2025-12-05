@@ -38,7 +38,7 @@ const coordinatorHeaderList = [
 ]
 
 
-export default function Header() {
+export default function Header({TabList = 1}) {
 
     // ----- USER SAMPLE -----
     const user = {
@@ -54,7 +54,18 @@ export default function Header() {
     };
 
     const navigate = useNavigate();
-    const navItems = defaultHeaderList; // This can be modified to switch between different header lists
+    let navItems = []; // This can be modified to switch between different header lists
+    switch (TabList) {
+        case 1:
+            navItems = defaultHeaderList;
+            break;
+        case 2:
+            navItems = coordinatorHeaderList;
+            break;
+        default:
+            navItems = defaultHeaderList;
+    }
+
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const [showUserMenu, setShowUserMenu] = useState(false);
 
