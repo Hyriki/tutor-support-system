@@ -57,12 +57,31 @@ const NoDataMessage = () => (
 
 // --- MAIN COMPONENT ---
 const OptimizeResourceAllocation = () => {
-  // Thay vì dùng hằng số, ta dùng State để có thể đổi qua đổi lại
   const [simulateNoData, setSimulateNoData] = useState(false);
 
+  // --- 1. SỬA LẠI LOGIC KHI CLICK TAG ---
   const handleTagClick = (tagName) => {
-    sendNotification('student', 'You have a new tutor offer');
-    alert(`System Action: ${tagName} notification has been sent successfully.`);
+    let message = "";
+    
+    // Kiểm tra tên tag để gửi thông điệp phù hợp
+    if (tagName === "Tutor offer") {
+        message = "You have received a new Tutor Offer! Check your dashboard.";
+    } else if (tagName === "Extra class") {
+        message = "You have been recommended for an Extra Class based on your performance.";
+    } else {
+        message = `New notification regarding: ${tagName}`;
+    }
+
+    sendNotification('student', message);
+    alert(`System Action: Sent "${tagName}" notification successfully.`);
+  };
+
+  // --- 2. HÀM XỬ LÝ KHI CLICK ACCEPT ---
+  const handleAcceptMatch = (matchData) => {
+    const message = `You have been assigned to tutor ${matchData.employeeName}.`;
+    
+    sendNotification('student', message);
+    alert(`Matched ${matchData.studentName} with ${matchData.employeeName}`);
   };
 
   return (
@@ -71,7 +90,7 @@ const OptimizeResourceAllocation = () => {
       
       <main className="flex-grow max-w-7xl mx-auto w-full px-6 py-8">
         
-        {/* --- [DEMO TOOL] NÚT BẬT TẮT CHẾ ĐỘ LỖI (CHỈ DÙNG KHI DEMO) --- */}
+        {/* --- [DEMO TOOL] --- */}
         <div className="flex justify-end mb-4">
             <label className="flex items-center gap-2 cursor-pointer bg-gray-200 px-4 py-2 rounded-full text-xs font-bold text-gray-600 hover:bg-gray-300 border border-gray-300 shadow-sm transition-all">
                 <input 
@@ -89,8 +108,7 @@ const OptimizeResourceAllocation = () => {
           <NoDataMessage />
         ) : (
           <>
-            {/* --- SECTION 0: OPTIMIZATION SUMMARY (TEST CASE 004_1) --- */}
-            {/* Phần này bị thiếu trong code cũ của bạn, tôi đã thêm lại */}
+            {/* --- SECTION 0: SUMMARY --- */}
             <section className="mb-12">
               <h1 className="text-xl font-bold text-gray-800 mb-6">Optimization Summary</h1>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -100,7 +118,7 @@ const OptimizeResourceAllocation = () => {
               </div>
             </section>
 
-            {/* --- SECTION 1: PENDING REGISTRATIONS --- */}
+            {/* --- SECTION 1: PENDING REGISTRATIONS (TAGS) --- */}
             <section className="mb-12">
               <h1 className="text-xl font-bold text-gray-800 mb-6">Pending registrations</h1>
               {pendingRegistrations.map((group) => (
@@ -117,6 +135,7 @@ const OptimizeResourceAllocation = () => {
                         {group.tags.map((tag, i) => (
                           <button 
                             key={i} 
+                            // Gọi hàm xử lý tag đã sửa ở trên
                             onClick={() => handleTagClick(tag)} 
                             className="bg-cyan-100 text-cyan-700 text-xs px-2 py-1 rounded font-medium hover:bg-cyan-200 transition-colors cursor-pointer border border-cyan-200"
                           >
@@ -125,6 +144,7 @@ const OptimizeResourceAllocation = () => {
                         ))}
                       </div>
                     </div>
+                    {/* ... (Phần bảng Students giữ nguyên) ... */}
                     <div className="overflow-x-auto">
                       <table className="w-full text-sm text-left">
                         <thead>
@@ -163,7 +183,7 @@ const OptimizeResourceAllocation = () => {
               ))}
             </section>
 
-            {/* --- SECTION 2: AUTOMATIC MATCHING --- */}
+            {/* --- SECTION 2: AUTOMATIC MATCHING (ACCEPT BUTTON) --- */}
             <section>
               <h1 className="text-xl font-bold text-gray-800 mb-6">Automatic matching</h1>
               <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-100">
@@ -188,11 +208,9 @@ const OptimizeResourceAllocation = () => {
                           <td className="py-4 px-4 text-gray-600">{match.employeeName}</td>
                           <td className="py-4 px-4 text-gray-600">{match.classId}</td>
                           <td className="py-4 px-4 text-right">
+                            {/* Gọi hàm xử lý Accept đã sửa ở trên */}
                             <button 
-                                onClick={() => {
-                                    sendNotification('student', 'You have a new tutor offer');
-                                    alert(`Matched ${match.studentName} with ${match.employeeName}`);
-                                }}
+                                onClick={() => handleAcceptMatch(match)}
                                 className="bg-[#0097B2] hover:bg-[#007f96] text-white font-medium py-1.5 px-6 rounded text-xs transition-colors shadow-sm"
                             >
                               Accept
