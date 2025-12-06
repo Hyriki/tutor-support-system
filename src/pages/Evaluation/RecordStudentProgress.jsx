@@ -6,6 +6,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 // Import các component con
 import FormRow from '../../components/evaluation/Form/FormRow';
 import FormInput from '../../components/evaluation/Form/FormInput';
+import { sendNotification } from '../../../lib/notificationHelper';
 import FormSelect from '../../components/evaluation/Form/FormSelect';
 import ProfileSection from '../../components/evaluation/Profile/ProfileSection';
 import AvatarUploader from '../../components/evaluation/Profile/AvatarUploader';
@@ -17,7 +18,7 @@ const RecordStudentProgress = () => {
 
   // Dữ liệu hard-code
   const studentData = {
-    id: studentId,
+    id: 2352429,
     firstName: "Hung",
     lastName: "Lu Thuan",
     imageUrl: "https://i.postimg.cc/Y26Hyycd/My-Avatar2.png",
@@ -82,6 +83,7 @@ const RecordStudentProgress = () => {
     alert("Success: Student progress has been recorded.");
     console.log("Submitting:", formData);
     localStorage.removeItem(storageKey);
+    sendNotification('admin', 'Tutor has submitted a progress report');
     // Đây là nơi xử lý logic submit, ví dụ:
     // navigate('/path-to-success-page');
   };

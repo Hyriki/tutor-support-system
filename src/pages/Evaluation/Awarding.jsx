@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { sendNotification } from '../../../lib/notificationHelper';
 import Header from '../../components/header/Header'; 
 import Footer from '../../components/footer/Footer';
 import { FaEdit, FaFileExport, FaAward, FaMedal, FaListAlt, FaCheckCircle, FaSpinner, FaCheckDouble } from 'react-icons/fa';
@@ -80,6 +81,7 @@ const Awarding = () => {
     
     if (confirmed) {
         setIsPublished(true);
+        sendNotification('student', 'Scholarship results have been published');
         alert("✅ Success! Results published and locked.");
     }
   };
@@ -93,7 +95,7 @@ const Awarding = () => {
 
   return (
     <div className="bg-gray-50 min-h-screen flex flex-col">
-      <Header />
+      <Header TabList={2}/>
 
       <main className="flex-grow max-w-7xl mx-auto w-full px-6 py-8">
         

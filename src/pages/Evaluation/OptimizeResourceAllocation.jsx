@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { sendNotification } from '../../../lib/notificationHelper';
 import Header from '../../components/header/Header';
 import Footer from '../../components/footer/Footer';
 
@@ -60,12 +61,13 @@ const OptimizeResourceAllocation = () => {
   const [simulateNoData, setSimulateNoData] = useState(false);
 
   const handleTagClick = (tagName) => {
+    sendNotification('student', 'You have a new tutor offer');
     alert(`System Action: ${tagName} notification has been sent successfully.`);
   };
 
   return (
     <div className="bg-gray-50 min-h-screen flex flex-col">
-      <Header />
+      <Header TabList={2}/>
       
       <main className="flex-grow max-w-7xl mx-auto w-full px-6 py-8">
         
@@ -187,7 +189,10 @@ const OptimizeResourceAllocation = () => {
                           <td className="py-4 px-4 text-gray-600">{match.classId}</td>
                           <td className="py-4 px-4 text-right">
                             <button 
-                                onClick={() => alert(`Matched ${match.studentName} with ${match.employeeName}`)}
+                                onClick={() => {
+                                    sendNotification('student', 'You have a new tutor offer');
+                                    alert(`Matched ${match.studentName} with ${match.employeeName}`);
+                                }}
                                 className="bg-[#0097B2] hover:bg-[#007f96] text-white font-medium py-1.5 px-6 rounded text-xs transition-colors shadow-sm"
                             >
                               Accept

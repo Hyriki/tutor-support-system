@@ -91,7 +91,7 @@ const AnalyzeRecordData = () => {
 
   return (
     <div className="min-h-screen bg-white">
-      <Header />
+      <Header TabList={2}/>
 
       <main className="max-w-7xl mx-auto px-8 py-8 text-gray-800">
         

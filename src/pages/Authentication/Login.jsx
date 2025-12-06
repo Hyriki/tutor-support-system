@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Header from "../../components/header/Header";
 import Footer from "../../components/footer/Footer";
-import { validateCredentials } from "../../../lib/auth";
+
 
 export const Login = () => {
   const navigate = useNavigate();
@@ -12,23 +12,23 @@ export const Login = () => {
 
   const handleLogin = (e) => {
     e.preventDefault();
-    setError("");
+    setError('');
 
-    if (!username.trim() || !password.trim()) {
-      setError("Please fill in all fields");
-      return;
+    let user;
+
+    if (username === 'student' && password === 'student123') {
+      user = { name: 'Nguyen Van Student', role: 'student' };
+    } else if (username === 'tutor' && password === 'tutor123') {
+      user = { name: 'Tran Van Tutor', role: 'tutor' };
+    } else if (username === 'admin' && password === 'admin123') {
+      user = { name: 'Le Thi Admin', role: 'admin' };
     }
 
-    const account = validateCredentials(username, password);
-    
-    if (account) {
-      // Store user info in sessionStorage
-      sessionStorage.setItem("user", JSON.stringify(account));
-      alert(`Welcome ${account.fullName}! You are logged in as ${account.role}.`);
-      // You can redirect based on role here if needed
-      // navigate(`/${account.role}-dashboard`);
+    if (user) {
+      localStorage.setItem('currentUser', JSON.stringify(user));
+      navigate('/');
     } else {
-      setError("Invalid username/email or password");
+      alert('Invalid username or password');
     }
   };
 
