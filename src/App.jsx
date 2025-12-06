@@ -17,7 +17,7 @@ import {
 import CourseStructure from './pages/Resource/CourseStructure'
 import SchedulingPage from './pages/Sessions/SchedulingPage'
 import RegisterCourse from './pages/RegisterCourse/RegisterCourse'
-import FileDetails from './pages/Resource/FileDetails'
+import CourseStructureStudent from './pages/Resource/CourseStructureStudent'
 
 function App() {
   return (
@@ -42,6 +42,7 @@ function App() {
       {/* RESOURCE MODULE */}
       <Route path="/user/private" element={<PrivateStorage />} />
       <Route path="/courses" element={<CourseStructure/>} />
+      <Route path="/courses/student" element={<CourseStructureStudent />} />
       {/* SCHEDULE MODULE */}
       <Route path="/sessions" element={<SchedulingPage isTutor = {false} />} />
       <Route path="/sessions/register" element={<SchedulingPage isRegister = {true} />} />

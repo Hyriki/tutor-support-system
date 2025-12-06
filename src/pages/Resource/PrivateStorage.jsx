@@ -501,7 +501,8 @@ const PrivateStorage = () => {
                                     size: String(size),
                                     size_unit: unit,
                                     lastModified: new Date().toISOString(),
-                                    parentId: currentFolderId
+                                    parentId: currentFolderId,
+                                    isPrivate: true
                                 };
                                 setItemList(prev => {
                                     const exists = prev.some(p => p.id === uploadId || (p.title?.toLowerCase() === newItem.title.toLowerCase() && p.size === newItem.size && p.size_unit === newItem.size_unit));

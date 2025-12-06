@@ -28,7 +28,7 @@ const FolderCard = ({ onCreate, onCancel }) => {
                         value={folderName}
                         onChange={(e) => setFolderName(e.target.value)}
                         onKeyDown={handleKeyDown}
-                        className="font-semibold text-sm truncate w-full border-b-2 border-gray-300 focus:border-primary focus:outline-none"
+                        className="font-semibold text-sm text-black truncate w-full border-b-2 border-gray-300 focus:border-primary focus:outline-none"
                         autoFocus
                         onFocus={(e) => e.target.select()} 
                     />
