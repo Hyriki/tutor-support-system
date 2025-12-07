@@ -1,16 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { 
-    FaSearch, FaChevronDown, FaBars, FaTimes, FaEnvelope, FaBell, // Thêm FaBell
-    FaSignInAlt, FaUserPlus, FaUser, FaShoppingCart, FaCog,
-    FaIdCard, FaSignOutAlt, FaFolder,
-    FaTrophy, FaAward,            
-    FaChartBar, FaChartLine, FaChartPie,     
-    FaPen, FaEdit, FaStar,       
-    FaClipboardList,              
-    FaUserGraduate, FaUserCircle,  
-    FaSlidersH, FaCogs, FaProjectDiagram    
+    FaSearch, FaChevronDown, FaBars, FaTimes, FaEnvelope, FaBell,
+    FaSignInAlt, FaUserPlus, FaUser, FaFolder,
+    FaTrophy, FaChartBar, FaChartPie, FaSignOutAlt, FaUserCircle,
+    FaClipboardList, FaStar
 } from 'react-icons/fa';
+
+// Giả sử bạn dùng axios để gọi API (nhớ cài: npm install axios)
+import axios from 'axios'; 
+
+// Import các Component con
+import MessageWindow from './MessageWindow'; 
+import Notification from '../../components/notification/Notification'; 
 
 // Component Icon con
 const SearchIcon = () => <FaSearch />;
@@ -19,12 +21,6 @@ const BarsIcon = () => <FaBars />;
 const TimesIcon = () => <FaTimes />;
 const EnvelopeIcon = () => <FaEnvelope />; 
 const BellIcon = () => <FaBell />;
-
-// Import các Component con (Message & Notification)
-import MessageWindow from './MessageWindow'; 
-// Giả sử component Notification của bạn nằm ở đây
-import Notification from '../../components/notification/Notification'; 
-
 
 // --- Navigation Items ---
 const defaultHeaderList = [
@@ -41,10 +37,13 @@ const coordinatorHeaderList = [
 export default function Header({TabList = 1}) {
     const navigate = useNavigate();
     
-    // --- 1. DYNAMIC AUTH STATE (Logic lấy từ localStorage) ---
+    // --- 1. AUTH STATE ---
     const [user, setUser] = useState(null);
     const [isAuthenticated, setIsAuthenticated] = useState(false);
     const [loading, setLoading] = useState(true);
+
+    // --- STATE MỚI CHO NOTIFICATION ---
+    const [unreadCount, setUnreadCount] = useState(0); // Số lượng thông báo chưa đọc
 
     useEffect(() => {
         const storedUser = localStorage.getItem('currentUser');
@@ -58,14 +57,45 @@ export default function Header({TabList = 1}) {
         setLoading(false);
     }, []);
 
+    // --- 2. LOGIC REAL-TIME (POLLING) ---
+    useEffect(() => {
+        // Chỉ chạy khi đã đăng nhập
+        if (!isAuthenticated || !user) return;
+
+        const fetchNotificationCount = async () => {
+            try {
+                // [LƯU Ý]: Thay đường dẫn này bằng API thực tế của bạn
+                // Ví dụ: GET /api/notifications/unread-count
+                const response = await axios.get(`YOUR_API_URL/notifications/count/${user.id}`);
+                
+                // Giả sử API trả về { count: 5 }
+                setUnreadCount(response.data.count); 
+            } catch (error) {
+                console.error("Lỗi lấy thông báo:", error);
+            }
+        };
+
+        // Gọi ngay lần đầu
+        fetchNotificationCount();
+
+        // Thiết lập Polling: Gọi lại sau mỗi 3 giây (3000ms)
+        // Kỹ thuật này giúp 2 tab cập nhật gần như tức thì khi demo
+        const intervalId = setInterval(fetchNotificationCount, 3000);
+
+        // Dọn dẹp interval khi component unmount hoặc user logout
+        return () => clearInterval(intervalId);
+    }, [isAuthenticated, user]);
+
+
     const handleLogout = () => {
         localStorage.removeItem('currentUser');
         setUser(null);
         setIsAuthenticated(false);
+        setUnreadCount(0); // Reset thông báo
         navigate('/login');
     };
 
-    // --- 2. MENU SWITCHING ---
+    // --- MENU SWITCHING ---
     let navItems = [];
     switch (TabList) {
         case 1: navItems = defaultHeaderList; break;
@@ -73,12 +103,10 @@ export default function Header({TabList = 1}) {
         default: navItems = defaultHeaderList;
     }
 
-    // --- 3. UI STATES ---
+    // --- UI STATES ---
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const [showUserMenu, setShowUserMenu] = useState(false);
     const [isMessageWindowOpen, setIsMessageWindowOpen] = useState(false);
-    
-    // State mới cho Notification (Cái chuông)
     const [isNotificationOpen, setIsNotificationOpen] = useState(false); 
 
     const linkClassName = ({ isActive }) =>
@@ -135,7 +163,7 @@ export default function Header({TabList = 1}) {
                     {/* CHỈ HIỆN KHI ĐÃ LOGIN */}
                     {isAuthenticated && (
                         <>
-                            {/* Message Button (Icon Phong bì) */}
+                            {/* Message Button */}
                             <button
                                 onClick={() => setIsMessageWindowOpen(!isMessageWindowOpen)}
                                 className="hover:text-cyan-100 transition-colors relative"
@@ -143,13 +171,22 @@ export default function Header({TabList = 1}) {
                                 <EnvelopeIcon />
                             </button>
 
-                            {/* --- NEW: NOTIFICATION BELL (Icon cái chuông) --- */}
+                            {/* --- NOTIFICATION BELL (Đã thêm Badge) --- */}
                             <button
-                                onClick={() => setIsNotificationOpen(!isNotificationOpen)}
+                                onClick={() => {
+                                    setIsNotificationOpen(!isNotificationOpen);
+                                    // Optional: Khi mở ra thì reset số lượng về 0 (nếu muốn)
+                                    // setUnreadCount(0); 
+                                }}
                                 className="hover:text-cyan-100 transition-colors relative"
                             >
                                 <BellIcon />
-                                {/* Logic hiển thị chấm đỏ (nếu muốn) có thể thêm ở đây */}
+                                {/* Hiển thị chấm đỏ nếu có thông báo mới */}
+                                {unreadCount > 0 && (
+                                    <span className="absolute -top-1.5 -right-1.5 bg-red-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] flex items-center justify-center border border-primary">
+                                        {unreadCount > 99 ? '99+' : unreadCount}
+                                    </span>
+                                )}
                             </button>
                         </>
                     )}
@@ -175,7 +212,7 @@ export default function Header({TabList = 1}) {
                                     {loading ? (
                                         <li className="px-4 py-2 text-center text-gray-500">Loading...</li>
                                     ) : !isAuthenticated ? (
-                                        // --- GUEST MENU ---
+                                        // GUEST MENU
                                         <>
                                             <li>
                                                 <button onClick={() => { navigate('/login'); setShowUserMenu(false); }} className="flex items-center gap-2 px-4 py-2 hover:bg-gray-100 w-full text-left">
@@ -189,7 +226,7 @@ export default function Header({TabList = 1}) {
                                             </li>
                                         </>
                                     ) : (
-                                        // --- LOGGED IN USER MENU ---
+                                        // LOGGED IN USER MENU
                                         <>
                                             <li className="px-4 py-3 bg-gray-50 border-b border-gray-100">
                                                 <p className="font-bold text-gray-900 truncate">{user?.name}</p>
@@ -283,10 +320,16 @@ export default function Header({TabList = 1}) {
             onClose={() => setIsMessageWindowOpen(false)} 
         />
         
-        {/* --- COMPONENT NOTIFICATION (Đã thêm mới) --- */}
+        {/* --- COMPONENT NOTIFICATION --- */}
+        {/* Để danh sách thông báo bên trong cũng cập nhật realtime, 
+            bạn cũng nên áp dụng logic Polling tương tự bên trong file Notification.jsx 
+            hoặc truyền props triggerUpdate vào.
+        */}
         <Notification 
             isOpen={isNotificationOpen}
             onClose={() => setIsNotificationOpen(false)}
+            // Nếu component Notification của bạn nhận props để render lại, hãy truyền vào đây
+            // key={unreadCount} // Mẹo: Thay đổi key sẽ buộc component re-render và fetch lại dữ liệu
         /> 
             
     </header>

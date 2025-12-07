@@ -6,7 +6,7 @@ import { FaEdit, FaFileExport, FaAward, FaMedal, FaListAlt, FaCheckCircle, FaSpi
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
-// --- MOCK DATA (Đã sửa lại key 'class' thành 'classId' cho chuẩn) ---
+// --- MOCK DATA ---
 const initialStudents = [
   { id: '2352429', name: 'L.T.H', scholarship: 1, credit: 100, creditChange: 1, classId: 'CC01', gpa: 9.5, participation: 'High' },
   { id: '2352430', name: 'Tran Duc Duy', scholarship: 1, credit: 100, creditChange: 1, classId: 'CC01', gpa: 9.2, participation: 'High' },
@@ -26,7 +26,71 @@ const Awarding = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [isPublished, setIsPublished] = useState(false);
 
-  // --- HÀM XUẤT PDF ---
+  // --- 1. STATE MỚI ĐỂ QUẢN LÝ DỮ LIỆU HIỂN THỊ ---
+  // isCalculated: Dùng cho Tab Training Credit. Khi true mới hiện phần (+/- change)
+  const [isCalculated, setIsCalculated] = useState(false);
+  
+  // filteredScholarshipList: Dùng cho Tab Scholarship. Khi nhấn Check Criteria mới lọc ra list này
+  const [filteredScholarshipList, setFilteredScholarshipList] = useState(initialStudents); // Mặc định hiển thị hết
+  const [isCriteriaChecked, setIsCriteriaChecked] = useState(false); // Đã lọc hay chưa
+
+  // --- HÀM XỬ LÝ LOGIC (ĐÃ CẬP NHẬT) ---
+  const handleProcessing = (type) => {
+    setIsProcessing(true);
+    
+    // Giả lập delay xử lý
+    setTimeout(() => {
+        setIsProcessing(false);
+        
+        if (type === 'scholarship') {
+            // Logic lọc sinh viên có GPA >= 8.0
+            const qualifiedStudents = initialStudents.filter(s => s.gpa >= 8.0);
+            setFilteredScholarshipList(qualifiedStudents);
+            setIsCriteriaChecked(true); // Đánh dấu đã lọc
+            alert(`✅ Criteria Checked! Found ${qualifiedStudents.length} eligible candidates with GPA >= 8.0.`);
+        } else { 
+            // Logic tính toán Credits
+            setIsCalculated(true); // Đánh dấu đã tính toán -> Hiện Credit Change
+            alert("✅ Participation Proofs Verified! Credit changes have been calculated and updated.");
+        }
+    }, 1000);
+  };
+  
+  // --- HÀM LẤY DANH SÁCH HIỂN THỊ THEO TAB ---
+  const getDisplayData = () => {
+      if (activeTab === 'scholarship') {
+          // Nếu đang ở tab Scholarship và đã bấm nút Check -> Trả về list đã lọc
+          // Nếu chưa bấm nút -> Trả về list gốc (hoặc list rỗng tùy ý bạn, ở đây mình để list gốc để xem trước)
+          return isCriteriaChecked ? filteredScholarshipList : students;
+      }
+      // Các tab khác dùng list gốc
+      return students;
+  };
+
+  const displayList = getDisplayData();
+
+  // --- HELPER FORMAT CREDIT ---
+  const formatCreditChange = (change) => {
+    // Chỉ hiện nếu đã tính toán (isCalculated = true) HOẶC đang ở tab report (muốn xem tổng kết luôn)
+    // Nhưng theo yêu cầu của bạn: Tab Training Credit chỉ hiện khi nhấn nút.
+    // Tab Report (tổng kết cuối) thì nên hiện luôn kết quả cuối cùng.
+    
+    if (activeTab === 'credits' && !isCalculated) return null; // Ẩn khi chưa tính ở tab Credits
+
+    const sign = change > 0 ? '+' : '';
+    const color = change > 0 ? 'text-green-600' : 'text-red-600';
+    return <span className={`text-xs ml-1 ${color}`}>({sign}{change})</span>;
+  };
+
+  const handlePublish = () => {
+    const confirmed = window.confirm("Are you sure you want to finalize and publish this list? This action cannot be undone.");
+    if (confirmed) {
+        setIsPublished(true);
+        sendNotification('student', 'Scholarship results have been published');
+        alert("✅ Success! Results published and locked.");
+    }
+  };
+
   const handleExportPDF = () => {
     const doc = new jsPDF();
     const title = activeTab === 'report' ? 'General Awarding Report' 
@@ -40,16 +104,19 @@ const Awarding = () => {
 
     let tableHead = [];
     let tableBody = [];
+    
+    // Dùng displayList (danh sách đã lọc) để xuất PDF
+    const dataToExport = displayList; 
 
     if (activeTab === 'report') {
         tableHead = [['Student ID', 'Name', 'Scholarship', 'Credit', 'Class']];
-        tableBody = students.map(s => [s.id, s.name, s.scholarship || '0', `${s.credit} (${s.creditChange > 0 ? '+' : ''}${s.creditChange})`, s.classId]);
+        tableBody = dataToExport.map(s => [s.id, s.name, s.scholarship || '0', `${s.credit} (${s.creditChange > 0 ? '+' : ''}${s.creditChange})`, s.classId]);
     } else if (activeTab === 'scholarship') {
         tableHead = [['Student ID', 'Name', 'Class', 'GPA']];
-        tableBody = students.map(s => [s.id, s.name, s.classId, s.gpa]);
-    } else { // credits
+        tableBody = dataToExport.map(s => [s.id, s.name, s.classId, s.gpa]);
+    } else { 
         tableHead = [['Student ID', 'Name', 'Class', 'Total Credit']];
-        tableBody = students.map(s => [s.id, s.name, s.classId, `${s.credit} (${s.creditChange > 0 ? '+' : ''}${s.creditChange})`]);
+        tableBody = dataToExport.map(s => [s.id, s.name, s.classId, `${s.credit} ${isCalculated ? `(${s.creditChange > 0 ? '+' : ''}${s.creditChange})` : ''}`]);
     }
 
     autoTable(doc, {
@@ -61,36 +128,6 @@ const Awarding = () => {
     });
 
     doc.save(`${title.replace(/\s+/g, '_')}.pdf`);
-  };
-
-  // --- LOGIC GIẢ LẬP XỬ LÝ ---
-  const handleProcessing = (type) => {
-    setIsProcessing(true);
-    setTimeout(() => {
-        setIsProcessing(false);
-        const msg = type === 'scholarship' 
-            ? "✅ Scholarship Criteria Checked! List generated based on GPA." 
-            : "✅ Participation Proofs Verified! Merit points calculated.";
-        alert(msg);
-    }, 1500);
-  };
-  
-  // --- LOGIC GIẢ LẬP PUBLISH ---
-  const handlePublish = () => {
-    const confirmed = window.confirm("Are you sure you want to finalize and publish this list? This action cannot be undone.");
-    
-    if (confirmed) {
-        setIsPublished(true);
-        sendNotification('student', 'Scholarship results have been published');
-        alert("✅ Success! Results published and locked.");
-    }
-  };
-
-  // Helper function to format credit change
-  const formatCreditChange = (change) => {
-    const sign = change > 0 ? '+' : '';
-    const color = change > 0 ? 'text-green-600' : 'text-red-600';
-    return <span className={`text-xs ml-1 ${color}`}>({sign}{change})</span>;
   };
 
   return (
@@ -132,7 +169,7 @@ const Awarding = () => {
                     </h2>
                     <p className="text-sm text-gray-500 mt-1">
                         {activeTab === 'scholarship' 
-                            ? 'Run algorithm to filter students with GPA > 8.0.' 
+                            ? 'Run algorithm to filter students with GPA >= 8.0.' 
                             : 'Verify activity proofs and update merit scores.'}
                     </p>
                 </div>
@@ -162,7 +199,6 @@ const Awarding = () => {
                 <table className="w-full text-sm text-left">
                     <thead className="text-xs text-gray-600 uppercase bg-gray-50 border-b">
                         <tr>
-                            {/* --- DYNAMIC HEADER --- */}
                             <th className="px-6 py-4">Student ID</th>
                             <th className="px-6 py-4">Student Name</th>
 
@@ -189,19 +225,19 @@ const Awarding = () => {
                         </tr>
                     </thead>
                     <tbody>
-                        {students.map((student, index) => (
+                        {/* Render danh sách đã qua xử lý (displayList) */}
+                        {displayList.map((student, index) => (
                             <tr key={index} className="bg-white border-b hover:bg-gray-50 transition-colors">
                                 
-                                {/* Common Columns */}
                                 <td className="px-6 py-4 font-medium text-gray-900">{student.id}</td>
                                 <td className="px-6 py-4 font-bold text-gray-900">{student.name}</td>
 
-                                {/* --- DYNAMIC BODY --- */}
                                 {activeTab === 'report' && (
                                     <>
                                         <td className="px-6 py-4 text-gray-900">{student.scholarship || '0'}</td>
                                         <td className="px-6 py-4 text-gray-900">
                                             <span className="font-semibold">{student.credit}</span>
+                                            {/* Ở tab Report luôn hiện change */}
                                             {formatCreditChange(student.creditChange)}
                                         </td>
                                         <td className="px-6 py-4 text-gray-900">{student.classId}</td>
@@ -211,7 +247,10 @@ const Awarding = () => {
                                 {activeTab === 'scholarship' && (
                                     <>
                                         <td className="px-6 py-4 text-gray-900">{student.classId}</td>
-                                        <td className="px-6 py-4 font-bold text-blue-600">{student.gpa}</td>
+                                        {/* Tô màu GPA cao */}
+                                        <td className={`px-6 py-4 font-bold ${student.gpa >= 8.0 ? 'text-green-600' : 'text-gray-600'}`}>
+                                            {student.gpa}
+                                        </td>
                                     </>
                                 )}
 
@@ -220,6 +259,7 @@ const Awarding = () => {
                                         <td className="px-6 py-4 text-gray-900">{student.classId}</td>
                                         <td className="px-6 py-4 text-gray-900">
                                             <span className="font-bold">{student.credit}</span>
+                                            {/* Logic ẩn hiện (+1) nằm trong hàm này */}
                                             {formatCreditChange(student.creditChange)}
                                         </td>
                                     </>
@@ -235,12 +275,21 @@ const Awarding = () => {
                                 </td>
                             </tr>
                         ))}
+                        
+                        {/* Thông báo nếu lọc không ra kết quả */}
+                        {displayList.length === 0 && (
+                            <tr>
+                                <td colSpan="6" className="text-center py-8 text-gray-500 italic">
+                                    No students found matching the criteria.
+                                </td>
+                            </tr>
+                        )}
                     </tbody>
                 </table>
             </div>
             
             <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex justify-between items-center">
-                <span className="text-sm text-gray-500">Showing {students.length} students</span>
+                <span className="text-sm text-gray-500">Showing {displayList.length} students</span>
                 <div className="flex items-center gap-4">
                     <button 
                         onClick={handleExportPDF}

@@ -13,6 +13,7 @@
     "@aws-sdk/client-s3": "^3.946.0",
     "@aws-sdk/s3-request-presigner": "^3.946.0",
     "@tailwindcss/vite": "^4.1.16",
+    "axios": "^1.13.2",
     "iobuffer": "^6.0.1",
     "jspdf": "^3.0.4",
     "jspdf-autotable": "^5.0.2",

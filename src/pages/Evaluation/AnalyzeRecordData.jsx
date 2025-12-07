@@ -1,11 +1,11 @@
-import React from 'react';
-import Header from '../../components/header/Header'; // Điều chỉnh đường dẫn theo project của bạn
-import Footer from '../../components/footer/Footer'; // Điều chỉnh đường dẫn theo project của bạn
-import { FaFilter, FaFileDownload } from 'react-icons/fa';
+import React, { useState } from 'react';
+import Header from '../../components/header/Header'; 
+import Footer from '../../components/footer/Footer'; 
+import { FaFilter, FaFileDownload, FaExclamationTriangle } from 'react-icons/fa'; // Thêm icon cảnh báo
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-//Code: npm install jspdf jspdf-autotable
-// Dữ liệu giả lập y hệt trong hình Figma
+
+// --- MOCK DATA (Giữ nguyên) ---
 const detailedGrades = [
   { no: 1, id: '52023001', name: 'Alice Johnson', assignment: 90, midterm: 85, final: 92 },
   { no: 2, id: '52023002', name: 'Bob Williams', assignment: 75, midterm: 80, final: 78 },
@@ -31,21 +31,39 @@ const enrollmentTrends = [
   { name: 'AI & Machine Learning', enrollment: 110, change: '+8%', grade: 'A' },
 ];
 
-// Component con để tái sử dụng nút Filter và Export
-const ActionButtons = ({ onExport }) => (
+// --- COMPONENTS CON ---
+// Cập nhật ActionButtons để nhận props disabled
+const ActionButtons = ({ onExport, disabled }) => (
   <div className="flex gap-2">
-    <button className="flex items-center gap-2 px-3 py-1.5 border border-gray-300 rounded text-sm text-gray-600 hover:bg-gray-50 bg-white">
+    <button 
+        disabled={disabled}
+        className={`flex items-center gap-2 px-3 py-1.5 border border-gray-300 rounded text-sm text-gray-600 bg-white transition-all
+        ${disabled ? 'opacity-50 cursor-not-allowed bg-gray-100' : 'hover:bg-gray-50'}`}
+    >
       <FaFilter /> Filter
     </button>
-    <button onClick={onExport} className="flex items-center gap-2 px-3 py-1.5 bg-[#0097B2] text-white rounded text-sm hover:bg-[#007f96]">
+    <button 
+        onClick={onExport} 
+        disabled={disabled}
+        className={`flex items-center gap-2 px-3 py-1.5 text-white rounded text-sm transition-all
+        ${disabled ? 'bg-gray-400 cursor-not-allowed' : 'bg-[#0097B2] hover:bg-[#007f96]'}`}
+    >
       <FaFileDownload /> Export Report
     </button>
   </div>
 );
 
 const AnalyzeRecordData = () => {
+  // --- 1. STATE CHO DEMO TESTCASE 002_3 ---
+  const [isDeadlinePassed, setIsDeadlinePassed] = useState(false);
 
   const handleExportPDF = () => {
+    // Chặn chức năng nếu đã quá hạn (đề phòng trường hợp hack nút)
+    if (isDeadlinePassed) {
+        alert("Action failed: The publication window for this reporting session has closed.");
+        return;
+    }
+
     const doc = new jsPDF();
 
     // Main Title
@@ -73,7 +91,6 @@ const AnalyzeRecordData = () => {
         });
     }
 
-
     // Table 3: Enrollment Trends by Course
     doc.setFontSize(14);
     const secondLastTable = doc.lastAutoTable;
@@ -95,6 +112,30 @@ const AnalyzeRecordData = () => {
 
       <main className="max-w-7xl mx-auto px-8 py-8 text-gray-800">
         
+        {/* --- [DEMO TOOL] Nút bật tắt Testcase 002_3 --- */}
+        <div className="flex justify-end mb-4">
+            <label className="flex items-center gap-2 cursor-pointer bg-gray-100 px-4 py-2 rounded-full text-xs font-bold text-gray-600 hover:bg-gray-200 border border-gray-300 shadow-sm transition-all select-none">
+                <input 
+                    type="checkbox" 
+                    checked={isDeadlinePassed} 
+                    onChange={() => setIsDeadlinePassed(!isDeadlinePassed)}
+                    className="cursor-pointer"
+                />
+                🕒 DEMO: Simulate "Past Deadline" (Test Case 002_3)
+            </label>
+        </div>
+
+        {/* --- ERROR MESSAGE (Hiện khi quá hạn) --- */}
+        {isDeadlinePassed && (
+            <div className="bg-red-50 border-l-4 border-red-500 text-red-700 p-4 mb-6 rounded shadow-sm flex items-start animate-fade-in-down">
+                <FaExclamationTriangle className="mt-1 mr-3 text-xl" />
+                <div>
+                    <p className="font-bold">Error: The publication window for this reporting session has closed.</p>
+                    <p className="text-sm">You cannot filter data or export reports after the deadline (Current Date {'>'} Deadline).</p>
+                </div>
+            </div>
+        )}
+
         {/* --- Page Title --- */}
         <h1 className="text-xl font-bold mb-8">Record Data Overview</h1>
 
@@ -102,22 +143,21 @@ const AnalyzeRecordData = () => {
         <section className="mb-12">
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-lg font-semibold">Student Grade Distribution</h2>
-            <ActionButtons onExport={handleExportPDF} />
+            {/* Truyền trạng thái disabled vào nút */}
+            <ActionButtons onExport={handleExportPDF} disabled={isDeadlinePassed} />
           </div>
 
           <div className="flex justify-center items-center">
-            {/* ... (rest of the pie chart JSX) */}
             <div className="relative w-64 h-64 rounded-full" 
                  style={{
                    background: `conic-gradient(
-                     #2dd4bf 0% 20%,    /* Excellent - Teal */
-                     #e5e7eb 20% 55%,   /* Very Good - Gray */
-                     #374151 55% 85%,   /* Good - Dark Gray */
-                     #ef4444 85% 90%,   /* Needs Improvement - Red */
-                     #ffffff 90% 100%   /* Satisfactory - White/Gap placeholder */
+                     #2dd4bf 0% 20%,    
+                     #e5e7eb 20% 55%,   
+                     #374151 55% 85%,   
+                     #ef4444 85% 90%,   
+                     #ffffff 90% 100%   
                    )`
                  }}>
-                 {/* Legend / Annotations mô phỏng vị trí trong hình */}
                  <div className="absolute top-10 right-2 text-xs text-teal-600 font-bold">Excellent: 20%</div>
                  <div className="absolute top-1/2 right-0 transform translate-x-4 text-xs text-red-500 font-bold">Needs Improvement: 5%</div>
                  <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 text-xs text-gray-700 font-bold">Good: 30%</div>
@@ -138,7 +178,8 @@ const AnalyzeRecordData = () => {
         <section className="mb-12">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-lg font-semibold">Detailed Student Grade Report</h2>
-            <ActionButtons onExport={handleExportPDF} />
+            {/* Truyền trạng thái disabled vào nút */}
+            <ActionButtons onExport={handleExportPDF} disabled={isDeadlinePassed} />
           </div>
 
           <div className="overflow-x-auto">
@@ -176,7 +217,8 @@ const AnalyzeRecordData = () => {
           <div>
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-base font-semibold">Assignment Submissions Overview</h3>
-              <ActionButtons onExport={handleExportPDF} />
+              {/* Truyền trạng thái disabled vào nút */}
+              <ActionButtons onExport={handleExportPDF} disabled={isDeadlinePassed} />
             </div>
             <table className="w-full text-xs text-left">
               <thead className="text-gray-500 uppercase border-b">
@@ -205,7 +247,8 @@ const AnalyzeRecordData = () => {
           <div>
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-base font-semibold">Enrollment Trends by Course</h3>
-              <ActionButtons onExport={handleExportPDF} />
+              {/* Truyền trạng thái disabled vào nút */}
+              <ActionButtons onExport={handleExportPDF} disabled={isDeadlinePassed} />
             </div>
             <table className="w-full text-xs text-left">
               <thead className="text-gray-500 uppercase border-b">
