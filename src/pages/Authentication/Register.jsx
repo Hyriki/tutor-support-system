@@ -2,59 +2,49 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Header from "../../components/header/Header";
 import Footer from "../../components/footer/Footer";
-import { validateOldPassword, findAccount } from "../../../lib/auth";
 
 const formFields = [
-  { id: "username", label: "Username/Email", type: "text" },
-  { id: "oldPassword", label: "Old Password", type: "password" },
-  { id: "newPassword", label: "New Password", type: "password" },
+  { id: "username", label: "Username", type: "text" },
+  { id: "email", label: "Email", type: "email" },
+  { id: "password", label: "Password", type: "password" },
   { id: "confirmPassword", label: "Confirm Password", type: "password" },
 ];
 
-export const ChangePassword = () => {
+export const Register = () => {
   const navigate = useNavigate();
+
   const [username, setUsername] = useState("");
-  const [oldPassword, setOldPassword] = useState("");
-  const [newPassword, setNewPassword] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [role, setRole] = useState("");
   const [error, setError] = useState("");
 
   const handleSubmit = (e) => {
     e.preventDefault();
     setError("");
 
-    if (!username || !oldPassword || !newPassword || !confirmPassword) {
-      setError("Please fill in all fields");
+    if (!username || !email || !password || !confirmPassword || !role) {
+      setError("Please fill in all fields and select a role");
       return;
     }
 
-    const account = findAccount(username);
-    if (!account) {
-      setError("Account not found");
+    if (!email.includes("@") || !email.includes(".")) {
+      setError("Please enter a valid email address");
       return;
     }
 
-    if (!validateOldPassword(username, oldPassword)) {
-      setError("Old password is incorrect");
+    if (password.length < 6) {
+      setError("Password must be at least 6 characters long");
       return;
     }
 
-    if (newPassword.length < 6) {
-      setError("New password must be at least 6 characters long");
+    if (password !== confirmPassword) {
+      setError("Password and confirm password do not match");
       return;
     }
 
-    if (newPassword !== confirmPassword) {
-      setError("New password and confirm password do not match");
-      return;
-    }
-
-    if (oldPassword === newPassword) {
-      setError("New password must be different from old password");
-      return;
-    }
-
-    navigate("/confirmation");
+    navigate("/login");
   };
 
   return (
@@ -68,7 +58,7 @@ export const ChangePassword = () => {
         <div className="w-full max-w-[888px] bg-white/90 backdrop-blur-sm shadow-[0px_4px_4px_#00000040] rounded-xl border border-black/10 translate-y-[-1rem] animate-fade-in opacity-0 [--animation-delay:600ms]">
           <div className="p-12">
             <h2 className="text-center font-bold text-cyan-600 text-4xl tracking-[0] leading-[normal] mb-12 translate-y-[-1rem] animate-fade-in opacity-0 [--animation-delay:800ms]">
-              Change Your Password
+              Create Your Account
             </h2>
 
             <form className="space-y-8" onSubmit={handleSubmit}>
@@ -98,19 +88,19 @@ export const ChangePassword = () => {
                     value={
                       field.id === "username"
                         ? username
-                        : field.id === "oldPassword"
-                        ? oldPassword
-                        : field.id === "newPassword"
-                        ? newPassword
+                        : field.id === "email"
+                        ? email
+                        : field.id === "password"
+                        ? password
                         : confirmPassword
                     }
                     onChange={(e) => {
                       if (field.id === "username") {
                         setUsername(e.target.value);
-                      } else if (field.id === "oldPassword") {
-                        setOldPassword(e.target.value);
-                      } else if (field.id === "newPassword") {
-                        setNewPassword(e.target.value);
+                      } else if (field.id === "email") {
+                        setEmail(e.target.value);
+                      } else if (field.id === "password") {
+                        setPassword(e.target.value);
                       } else {
                         setConfirmPassword(e.target.value);
                       }
@@ -121,12 +111,45 @@ export const ChangePassword = () => {
                 </div>
               ))}
 
-              <div className="flex justify-center pt-8 translate-y-[-1rem] animate-fade-in opacity-0 [--animation-delay:1800ms]">
+              <div
+                className="grid grid-cols-[200px_1fr] gap-8 items-center translate-y-[-1rem] animate-fade-in opacity-0"
+                style={{ "--animation-delay": "1800ms" }}
+              >
+                <span className="font-semibold text-cyan-600 text-[32px] tracking-[0] leading-[normal] whitespace-nowrap">
+                  Role
+                </span>
+                <div className="flex gap-8 justify-end">
+                  <label className="flex items-center gap-2 text-lg text-gray-800">
+                    <input
+                      type="checkbox"
+                      className="w-5 h-5"
+                      checked={role === "Tutor"}
+                      onChange={() =>
+                        setRole((prev) => (prev === "Tutor" ? "" : "Tutor"))
+                      }
+                    />
+                    <span>Tutor</span>
+                  </label>
+                  <label className="flex items-center gap-2 text-lg text-gray-800">
+                    <input
+                      type="checkbox"
+                      className="w-5 h-5"
+                      checked={role === "Student"}
+                      onChange={() =>
+                        setRole((prev) => (prev === "Student" ? "" : "Student"))
+                      }
+                    />
+                    <span>Student</span>
+                  </label>
+                </div>
+              </div>
+
+              <div className="flex justify-center pt-8 translate-y-[-1rem] animate-fade-in opacity-0 [--animation-delay:2000ms]">
                 <button
                   type="submit"
                   className="w-[617px] h-[92px] bg-[#eaeaea] hover:bg-[#d5d5d5] rounded-lg border border-solid border-black shadow-[0px_4px_4px_#00000040] text-xl font-semibold text-black tracking-[0] leading-[normal] transition-colors"
                 >
-                  Confirm
+                  Register
                 </button>
               </div>
             </form>

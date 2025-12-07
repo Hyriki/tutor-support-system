@@ -3,10 +3,9 @@ import { useNavigate } from "react-router-dom";
 import Header from "../../components/header/Header";
 import Footer from "../../components/footer/Footer";
 
-
 export const Login = () => {
   const navigate = useNavigate();
-  const [username, setUsername] = useState("");
+  const [usernameOrEmail, setUsernameOrEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
 
@@ -16,19 +15,24 @@ export const Login = () => {
 
     let user;
 
-    if (username === 'student' && password === 'student123') {
-      user = { name: 'Nguyen Van Student', role: 'student' };
-    } else if (username === 'tutor' && password === 'tutor123') {
-      user = { name: 'Tran Van Tutor', role: 'tutor' };
-    } else if (username === 'admin' && password === 'admin123') {
-      user = { name: 'Le Thi Admin', role: 'admin' };
-    }
+    // Test accounts - hỗ trợ cả username và email
+    const testAccounts = [
+      { username: 'student', email: 'student@tutorconnect.com', password: 'student123', name: 'Nguyen Van Student', role: 'student' },
+      { username: 'tutor', email: 'tutor@tutorconnect.com', password: 'tutor123', name: 'Tran Van Tutor', role: 'tutor' },
+      { username: 'admin', email: 'admin@tutorconnect.com', password: 'admin123', name: 'Le Thi Admin', role: 'admin' }
+    ];
+
+    // Tìm user theo username HOẶC email
+    user = testAccounts.find(account => 
+      (account.username === usernameOrEmail || account.email === usernameOrEmail) && 
+      account.password === password
+    );
 
     if (user) {
       localStorage.setItem('currentUser', JSON.stringify(user));
       navigate('/');
     } else {
-      alert('Invalid username or password');
+      setError('Invalid username, email or password');
     }
   };
 
@@ -62,16 +66,16 @@ export const Login = () => {
 
               <div className="flex flex-col gap-3">
                 <label
-                  htmlFor="username"
+                  htmlFor="usernameOrEmail"
                   className="text-cyan-600 text-lg font-semibold"
                 >
                   Username or Email Address
                 </label>
                 <input
-                  id="username"
+                  id="usernameOrEmail"
                   type="text"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
+                  value={usernameOrEmail}
+                  onChange={(e) => setUsernameOrEmail(e.target.value)}
                   className="h-[60px] bg-white rounded-lg border-2 border-gray-300 text-lg px-4 text-gray-900 placeholder-gray-500 focus:border-cyan-600 focus:ring-2 focus:ring-cyan-200"
                   placeholder="Enter username or email"
                 />
@@ -100,44 +104,45 @@ export const Login = () => {
               >
                 Login
               </button>
-
-              <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg text-sm">
-                <p className="font-semibold mb-2 text-blue-900">Test Accounts:</p>
-                <div className="space-y-1 text-blue-800">
-                  <p><strong>Student:</strong> student / student123</p>
-                  <p><strong>Tutor:</strong> tutor / tutor123</p>
-                  <p><strong>Admin:</strong> admin / admin123</p>
-                </div>
-              </div>
             </form>
 
-            <div className="flex flex-col items-center gap-4 mt-4">
-              <button
-                onClick={() => navigate("/reset-password")}
-                className="font-medium text-[#111111] text-base underline hover:opacity-80 transition-opacity"
-              >
-                Forget password?
-              </button>
-
-              <button
-                onClick={() => navigate("/change-password")}
-                className="w-full max-w-[300px] h-[50px] border-2 border-gray-300 rounded-lg font-medium text-[#111111] text-lg hover:bg-gray-100 transition-colors"
-              >
-                Change password
-              </button>
-
-              <div className="flex items-center justify-center mt-4">
-                <p className="font-normal text-xs text-center text-gray-600">
-                  Secure Login with reCAPTCHA subject to Google{" "}
-                  <a href="#" className="text-gray-800 underline hover:opacity-80">
-                    Terms
-                  </a>
-                  {" & "}
-                  <a href="#" className="text-gray-800 underline hover:opacity-80">
-                    Privacy
-                  </a>
-                </p>
+            {/* Phần nút điều hướng - 2 nút ngang hàng */}
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-6 mt-6">
+              <div className="flex flex-col sm:flex-row items-center gap-4 text-center sm:text-left">
+                <button
+                  onClick={() => navigate("/reset-password")}
+                  className="font-medium text-[#111111] text-base underline hover:opacity-80 transition-opacity"
+                >
+                  Forget password?
+                </button>
+                <span className="hidden sm:inline text-gray-500">|</span>
+                <button
+                  onClick={() => navigate("/register")}
+                  className="font-medium text-[#111111] text-base underline hover:opacity-80 transition-opacity"
+                >
+                  Create Account
+                </button>
               </div>
+            </div>
+
+            <button
+              onClick={() => navigate("/change-password")}
+              className="w-full max-w-[300px] mx-auto h-[50px] border-2 border-gray-300 rounded-lg font-medium text-[#111111] text-lg hover:bg-gray-100 transition-colors"
+            >
+              Change password
+            </button>
+
+            <div className="flex items-center justify-center mt-4">
+              <p className="font-normal text-xs text-center text-gray-600">
+                Secure Login with reCAPTCHA subject to Google{" "}
+                <a href="#" className="text-gray-800 underline hover:opacity-80">
+                  Terms
+                </a>
+                {" & "}
+                <a href="#" className="text-gray-800 underline hover:opacity-80">
+                  Privacy
+                </a>
+              </p>
             </div>
           </section>
         </div>

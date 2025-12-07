@@ -13,6 +13,7 @@ import {
   Login,
   PasswordReset,
   ResetPassword,
+  Register,
 } from './pages/Authentication'
 import CourseStructure from './pages/Resource/CourseStructure'
 import SchedulingPage from './pages/Sessions/SchedulingPage'
@@ -38,6 +39,7 @@ function App() {
       <Route path="/evaluation/:studentId" element={<WriteEvaluationPage />} />
 
       {/* LOGIN MODULE */}
+      <Route path="/register" element={<Register />} />
       <Route path="/login" element={<Login />} />
       <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/password-reset-notification" element={<PasswordReset />} />

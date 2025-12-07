@@ -220,7 +220,7 @@ export default function Header({TabList = 1}) {
                                                 </button>
                                             </li>
                                             <li>
-                                                <button onClick={() => { navigate('/signup'); setShowUserMenu(false); }} className="flex items-center gap-2 px-4 py-2 hover:bg-gray-100 w-full text-left">
+                                                <button onClick={() => { navigate('register'); setShowUserMenu(false); }} className="flex items-center gap-2 px-4 py-2 hover:bg-gray-100 w-full text-left">
                                                     <FaUserPlus /> Sign Up
                                                 </button>
                                             </li>

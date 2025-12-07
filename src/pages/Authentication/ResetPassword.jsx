@@ -89,15 +89,6 @@ export const ResetPassword = () => {
                   Confirm
                 </button>
               </div>
-
-              <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg text-sm">
-                <p className="font-semibold mb-2 text-blue-900">Test Accounts:</p>
-                <div className="space-y-1 text-blue-800">
-                  <p><strong>Student:</strong> student@tutorconnect.com</p>
-                  <p><strong>Tutor:</strong> tutor@tutorconnect.com</p>
-                  <p><strong>Admin:</strong> admin@tutorconnect.com</p>
-                </div>
-              </div>
             </form>
           </div>
         </div>
