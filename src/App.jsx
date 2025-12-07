@@ -23,6 +23,10 @@ import TutorAvailability from './pages/RegisterCourse/TutorAvailability'
 import CreateClass from './pages/RegisterCourse/CreateClass'
 import ManageProgram from './pages/RegisterCourse/ProgramManagement'
 import CourseStructureStudent from './pages/Resource/CourseStructureStudent'
+import FileDetails from './pages/Resource/FileDetails'
+import TutorAvailability from './pages/RegisterCourse/TutorAvailability'
+import CreateClass from './pages/RegisterCourse/CreateClass'
+import ManageProgram from './pages/RegisterCourse/ProgramManagement'
 
 function App() {
   return (

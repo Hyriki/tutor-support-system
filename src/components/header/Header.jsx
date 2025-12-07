@@ -252,6 +252,7 @@ export default function Header({TabList = 1}) {
                                                     <li><button onClick={() => navigate('/analyze')} className="flex items-center gap-2 px-4 py-2 hover:bg-gray-100 w-full text-left"><FaChartPie /> Statistical</button></li>
                                                     <li><button onClick={() => navigate('/optimize')} className="flex items-center gap-2 px-4 py-2 hover:bg-gray-100 w-full text-left"><FaChartBar /> Optimize Resource</button></li>
                                                     <li><button onClick={() => navigate('/awarding')} className="flex items-center gap-2 px-4 py-2 hover:bg-gray-100 w-full text-left"><FaTrophy /> Awarding</button></li>
+                                                    <li><button onClick={() => navigate('/manage-program')} className="flex items-center gap-2 px-4 py-2 hover:bg-gray-100 w-full text-left"><FaClipboardList /> Manage Program</button></li>
                                                 </>
                                             )}
 
@@ -263,11 +264,25 @@ export default function Header({TabList = 1}) {
                                                 </>
                                             )}
 
+                                            {user?.role === 'tutor' && (
+                                                <>
+                                                    <div className="border-t my-1"></div>
+                                                    <li><button onClick={() => navigate('/set-availability')} className="flex items-center gap-2 px-4 py-2 hover:bg-gray-100 w-full text-left"><FaClipboardList /> Set availability</button></li>
+                                                </>
+                                            )}
+
                                             {/* Role-Based Items: Student */}
                                             {user?.role === 'student' && (
                                                 <>
                                                     <div className="border-t my-1"></div>
                                                     <li><button onClick={() => navigate('/evaluation/2352429')} className="flex items-center gap-2 px-4 py-2 hover:bg-gray-100 w-full text-left"><FaStar /> Write Evaluation</button></li>
+                                                </>
+                                            )}
+
+                                            {user?.role === 'student' && (
+                                                <>
+                                                    <div className="border-t my-1"></div>
+                                                    <li><button onClick={() => navigate('/register-course')} className="flex items-center gap-2 px-4 py-2 hover:bg-gray-100 w-full text-left"><FaClipboardList /> Register Program</button></li>
                                                 </>
                                             )}
 
