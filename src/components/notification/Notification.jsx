@@ -2,132 +2,128 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { RxCross2 } from 'react-icons/rx';
 import { TbCheck } from 'react-icons/tb';
 import { FaEnvelope } from 'react-icons/fa';
-import { useMemo } from "react";
-import { RxCross2 } from "react-icons/rx";
-import { TbCheck } from "react-icons/tb";
 
+// Hàm format ngày giờ
 const formatNotificationDate = (isoDate) => {
-  const date = new Date(isoDate);
-  const now = new Date();
-  const diff = (now - date) / (1000 * 60 * 60 * 24); // difference in days
-
-  if (
-    date.getDate() === now.getDate() &&
-    date.getMonth() === now.getMonth() &&
-    date.getFullYear() === now.getFullYear()
-  ) {
-    // Same day → show time
-    return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: true });
-  } else if (diff < 7) {
-    // Within a week → show day name
-    return date.toLocaleDateString([], { weekday: "short" });
-  } else {
-    // Older → show short date
-    return date.toLocaleDateString([], { day: "2-digit", month: "2-digit", year: "2-digit" });
-  }
+    if (!isoDate) return '';
+    const date = new Date(isoDate);
+    const now = new Date();
+    const diff = (now - date) / (1000 * 60 * 60 * 24); // difference in days
+  
+    if (
+      date.getDate() === now.getDate() &&
+      date.getMonth() === now.getMonth() &&
+      date.getFullYear() === now.getFullYear()
+    ) {
+      return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
+    } else if (diff < 7) {
+      return date.toLocaleDateString([], { weekday: 'short' });
+    } else {
+      return date.toLocaleDateString([], { day: '2-digit', month: '2-digit', year: '2-digit' });
+    }
 };
 
 export default function Notification({ isOpen, onClose }) {
+    // State nội bộ
     const [notifications, setNotifications] = useState([]);
+    const [currentUser, setCurrentUser] = useState(null);
 
-    // --- LOGIC 1: Đọc User từ SessionStorage (để tách biệt User giữa các Tab) ---
+    // 1. Lấy User hiện tại từ sessionStorage (để biết Role)
     useEffect(() => {
-        const storedUser = sessionStorage.getItem('currentUser'); // <-- Sửa thành sessionStorage
+        const storedUser = sessionStorage.getItem('currentUser');
         if (storedUser) {
             setCurrentUser(JSON.parse(storedUser));
         }
     }, []);
 
-    // --- LOGIC 2: Đọc Notification từ LocalStorage (để thông báo đi xuyên các Tab) ---
+    // 2. Hàm lấy thông báo từ localStorage
     const fetchNotifications = () => {
-        // Đọc lại user mới nhất (đề phòng chưa load kịp)
+        // Lấy user mới nhất để đảm bảo không bị null khi mới login
         const user = JSON.parse(sessionStorage.getItem('currentUser'));
-        if (!user) return;
+        if (!user) {
+            setNotifications([]);
+            return;
+        }
 
         const allNotifications = JSON.parse(localStorage.getItem('system_notifications')) || [];
         
-        // Lọc thông báo dành cho Role hiện tại (VD: Admin gửi cho Student -> Student mới thấy)
+        // Lọc thông báo cho Role hiện tại
         const userNotifications = allNotifications.filter(n => n.toRole === user.role);
-        
-        // Sắp xếp: Mới nhất lên đầu
-        const sorted = userNotifications.sort((a, b) => new Date(b.time) - new Date(a.time));
-        setNotifications(sorted);
+        setNotifications(userNotifications);
     };
 
-    // --- LOGIC 3: Auto Refresh (Polling) ---
+    // 3. Tự động cập nhật (Polling) mỗi 2 giây
     useEffect(() => {
-        // Gọi ngay khi mở
-        fetchNotifications();
-
-        // Cập nhật mỗi 2 giây để thấy thông báo mới ngay lập tức
+        fetchNotifications(); // Gọi ngay lần đầu
         const intervalId = setInterval(fetchNotifications, 2000);
-
-        // Lắng nghe sự kiện storage (khi tab khác update localStorage)
-        const handleStorageChange = (event) => {
-            if (event.key === 'system_notifications') {
-                fetchNotifications();
-            }
+        
+        // Lắng nghe sự kiện storage (hỗ trợ đa tab)
+        const handleStorageChange = (e) => {
+            if (e.key === 'system_notifications') fetchNotifications();
         };
         window.addEventListener('storage', handleStorageChange);
 
         return () => {
-            clearInterval(intervalId); // Dọn dẹp interval
+            clearInterval(intervalId);
             window.removeEventListener('storage', handleStorageChange);
         };
-    }, [isOpen]); // Chạy lại khi mở component
+    }, [isOpen]); // Reset khi mở/đóng
 
-    // --- LOGIC 4: Đánh dấu đã đọc ---
-    const handleMarkOneAsRead = (notificationId) => {
-        const allNotifications = JSON.parse(localStorage.getItem('system_notifications')) || [];
-        const updatedNotifications = allNotifications.map(n =>
-            n.id === notificationId ? { ...n, isRead: true } : n
-        );
-        localStorage.setItem('system_notifications', JSON.stringify(updatedNotifications));
-        fetchNotifications(); // Refresh lại list hiển thị
-    };
-    
+    // 4. Logic Sắp xếp: Chưa đọc lên đầu, Mới nhất lên đầu
+    const sorted = useMemo(() => 
+        [...notifications].sort((a, b) => {
+            if (a.isRead === b.isRead) {
+                return new Date(b.time) - new Date(a.time);
+            }
+            return a.isRead ? 1 : -1;
+        }), 
+    [notifications]);
+
+    // 5. Hàm đánh dấu Đã đọc (Tất cả)
     const handleMarkAllAsRead = () => {
         const user = JSON.parse(sessionStorage.getItem('currentUser'));
         if (!user) return;
 
         const allNotifications = JSON.parse(localStorage.getItem('system_notifications')) || [];
-        const updatedNotifications = allNotifications.map(n =>
+        const updatedNotifications = allNotifications.map(n => 
             n.toRole === user.role ? { ...n, isRead: true } : n
         );
+        
         localStorage.setItem('system_notifications', JSON.stringify(updatedNotifications));
-        fetchNotifications(); // Refresh lại list hiển thị
+        fetchNotifications(); // Refresh UI
     };
 
-    // Sắp xếp hiển thị: Chưa đọc lên đầu
-    const sortedDisplayNotifications = useMemo(
-        () =>
-            [...notifications].sort((a, b) => {
-                if (a.isRead === b.isRead) {
-                    return new Date(b.time) - new Date(a.time);
-                }
-                return a.isRead ? 1 : -1;
-            }),
-        [notifications]
-    );
+    // 6. Hàm đánh dấu Đã đọc (Một cái) - Gọi khi click vào thông báo
+    const handleMarkOneAsRead = (notifId) => {
+        const allNotifications = JSON.parse(localStorage.getItem('system_notifications')) || [];
+        const updatedNotifications = allNotifications.map(n => 
+            n.id === notifId ? { ...n, isRead: true } : n
+        );
+        localStorage.setItem('system_notifications', JSON.stringify(updatedNotifications));
+        fetchNotifications(); // Refresh UI
+    };
 
     if (!isOpen) return null;
 
     return (
-        <div className="fixed top-16 right-4 w-96 bg-white shadow-2xl border border-gray-200 rounded-lg z-50 flex flex-col max-h-[80vh]">
+        <div className="fixed inset-y-0 right-0 w-96 bg-white shadow-2xl border-l border-gray-200 z-[60] flex flex-col transition-transform duration-300 transform translate-x-0">
             {/* Header */}
-            <div className="flex items-center justify-between px-5 py-4 border-b bg-gray-50 rounded-t-lg">
+            <div className="flex items-center justify-between px-5 py-4 border-b bg-gray-50">
                 <h2 className="text-lg font-bold text-gray-800">Notifications</h2>
+                
+                {/* Action Buttons */}
                 <div className="flex gap-3 justify-end">
-                    <button
-                        className="p-1.5 hover:bg-gray-200 rounded-full transition text-gray-600"
+                    <button 
+                        className="p-2 hover:bg-gray-200 rounded-full transition text-gray-600"
                         onClick={handleMarkAllAsRead}
                         title="Mark all as read"
                     >
                         <TbCheck size={20} />
                     </button>
-                    <button
-                        className="p-1.5 hover:bg-gray-200 rounded-full transition text-gray-600"
+                    <button 
+                        className="p-2 hover:bg-gray-200 rounded-full transition text-gray-600"
                         onClick={onClose}
+                        title="Close"
                     >
                         <RxCross2 size={20} />
                     </button>
@@ -135,105 +131,40 @@ export default function Notification({ isOpen, onClose }) {
             </div>
 
             {/* List */}
-            <div className="flex-1 overflow-y-auto px-4 py-3">
-                {sortedDisplayNotifications.map((n) => (
-                    <div
-                        key={n.id}
-                        className={`flex justify-between items-start border border-gray-100 rounded-lg p-3 mb-3 transition shadow-sm ${n.isRead ? 'bg-white' : 'bg-blue-50 border-blue-200'}`}
-                        onClick={() => !n.isRead && handleMarkOneAsRead(n.id)}
-                        style={{ cursor: n.isRead ? 'default' : 'pointer' }}
-                    >
-                        <div className="flex-1 pr-2">
-                            <p className={`text-sm ${n.isRead ? 'text-gray-500' : 'text-gray-800 font-semibold'}`}>
-                                {n.message}
+            <div className="flex-1 overflow-y-auto px-4 py-3 bg-gray-50/50">
+                {sorted.length > 0 ? (
+                    sorted.map((n) => (
+                        <div
+                            key={n.id}
+                            className={`flex justify-between items-start border rounded-xl p-3 mb-3 transition-all cursor-pointer hover:shadow-md
+                                ${n.isRead ? "bg-white border-gray-200" : "bg-blue-50 border-blue-200"}`}
+                            onClick={() => !n.isRead && handleMarkOneAsRead(n.id)}
+                        >
+                            <div className="flex-1 pr-2">
+                                {/* Dòng 1: Tiêu đề giả lập (Vì data gốc chỉ có message) */}
+                                <p className={`text-xs uppercase tracking-wide mb-1 ${n.isRead ? "text-gray-500" : "text-blue-600 font-bold"}`}>
+                                    System Notification
+                                </p>
+                                
+                                {/* Dòng 2: Nội dung chính */}
+                                <p className={`text-sm leading-snug whitespace-pre-line ${n.isRead ? "text-gray-600" : "text-gray-900 font-medium"}`}>
+                                    {n.message}
+                                </p>
+                            </div>
+                            
+                            {/* Thời gian */}
+                            <p className={`text-[10px] ml-2 whitespace-nowrap ${n.isRead ? "text-gray-400" : "text-blue-500 font-semibold"}`}>
+                                {formatNotificationDate(n.time)}
                             </p>
                         </div>
-                        <p className={`text-[10px] ${n.isRead ? 'text-gray-400' : 'text-blue-500 font-medium'} whitespace-nowrap mt-0.5`}>
-                            {formatNotificationDate(n.time)}
-                        </p>
-                    </div>
-                ))}
-
-                {sortedDisplayNotifications.length === 0 && (
-                    <div className="flex flex-col items-center justify-center py-10 text-gray-400">
-                        <FaEnvelope className="text-4xl mb-2 opacity-20" /> {/* Nhớ import FaEnvelope nếu dùng */}
+                    ))
+                ) : (
+                    <div className="flex flex-col items-center justify-center h-64 text-gray-400">
+                        <FaEnvelope className="text-5xl mb-3 opacity-20" />
                         <p className="text-sm">No notifications yet.</p>
                     </div>
                 )}
             </div>
-export default function Notification({ showNoti, onClose, notifications, setNotifications, user}) {
-  if (!showNoti) return null;
-  const sorted = useMemo(
-    () =>
-      [...notifications[user.id]].sort((a, b) => {
-        if (a.isRead === b.isRead) {
-          return new Date(b.date) - new Date(a.date);
-        }
-        return a.isRead ? 1 : -1;
-      }),
-    [notifications[user.id]]
-  );
-
-  const handleMarkAsRead = () => {
-    setNotifications((prevData) => ({
-      ...prevData,
-      [user.id]: prevData[user.id].map((noti) => ({
-        ...noti,
-        isRead: true
-      }))
-    }));
-  };
-
- 
-  return (
-    <div className="fixed inset-y-0 right-0 w-96 bg-white shadow-2xl border-r z-50 flex flex-col">
-      {/* Header */}
-      <div className="flex items-center justify-between px-5 py-4 border-b">
-        <h2 className="text-lg font-bold text-primary">Notifications</h2>
-        {/* Close buttons */}
-        <div className="flex flex gap-3 justify-end">
-          <button 
-            className="p-1 hover:bg-text-primary/20 rounded-full transition text-text-primary"
-            onClick={handleMarkAsRead}
-          >
-            <TbCheck size={20} />
-          </button>
-          <button 
-            className="p-1 hover:bg-text-primary/20 rounded-full transition text-text-primary"
-            onClick={onClose}
-          >
-            <RxCross2 size={20} />
-          </button>
         </div>
-      </div>
-      {/* List */}
-      <div className="flex-1 overflow-y-auto px-4 py-3">
-        {sorted.map((n) => (
-          <div
-            key={n.id}
-            className={`flex justify-between items-start border border-text-primary ${n.isRead ? "bg-white" : "bg-text-primary/20"} rounded-xl p-3 mb-3 transition`}
-          >
-            <div>
-              <p className={`text-xs text-black ${n.isRead ? "font-normal" : "font-semibold"}`}>
-                {n.courseName} ({n.courseID}) · {n.tutor}
-              </p>
-              <p className={`text-sm text-black ${n.isRead ? "font-normal" : "font-semibold"}`}>
-                {n.title}
-              </p>
-              <p className={`text-sm ${n.isRead ? "text-text-primary" : "text-black"} whitespace-pre-line`}>
-                {n.description}
-              </p>
-            </div>
-            <p className={`text-xs ${n.isRead ? "text-text-primary" : "text-black"} ml-2 whitespace-nowrap`}>
-              {formatNotificationDate(n.date)}
-            </p>
-          </div>
-        ))}
-
-        {sorted.length === 0 && (
-          <p className="text-center text-gray-500 mt-10">No notifications yet.</p>
-        )}
-      </div>
-    </div>
-  );
+    );
 }
