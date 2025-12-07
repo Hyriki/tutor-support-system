@@ -3,10 +3,11 @@ import Header from "../../components/header/Header";
 import Footer from "../../components/footer/Footer";
 import CourseSectionStudent from '../../components/course/CourseSectionStudent';
 import FileDetails from './FileDetails';
+import { getDownloadUrl } from '../../lib/s3Client';
 import { useState, useRef, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 const COURSE_STORAGE_KEY = "tss_course_sections_v1";
-const COURSE_FILEDATA_PREFIX = "tss_course_file_";
 
 // Deduplicate items within each section by id
 const dedupeSections = (sections) =>
@@ -27,6 +28,7 @@ const lecturer = "Tran Truong Tan Phat";
 const className = "CC04 - CC05";
 
 export default function CourseStructureStudent() {
+    const navigate = useNavigate();
     const [sections, setSections] = useState([]);
     const [selectedItem, setSelectedItem] = useState(null);
     const fileDataRef = useRef({});
@@ -37,25 +39,14 @@ export default function CourseStructureStudent() {
             const data = saved && saved.length > 0 ? saved : [];
             const deduped = dedupeSections(data);
             setSections(deduped);
-
-            const fileData = {};
-            deduped?.forEach(section => {
-                section.items?.forEach(item => {
-                    if (item.id) {
-                        const key = `${COURSE_FILEDATA_PREFIX}${item.id}`;
-                        const stored = localStorage.getItem(key);
-                        if (stored) fileData[item.id] = stored;
-                    }
-                });
-            });
-            fileDataRef.current = fileData;
+            // S3 URLs are stored directly in items, no need to load from localStorage
         };
 
         loadFromStorage();
 
         const handleStorage = (e) => {
             if (!e.key) return;
-            if (e.key === COURSE_STORAGE_KEY || e.key.startsWith(COURSE_FILEDATA_PREFIX)) {
+            if (e.key === COURSE_STORAGE_KEY) {
                 loadFromStorage();
             }
         };
@@ -73,27 +64,56 @@ export default function CourseStructureStudent() {
         };
     }, []);
 
-    const handleViewDetails = (item) => {
-        if (item.type?.toLowerCase() === 'folder') {
+    const handleViewDetails = (incomingItem) => {
+        let fullItem = null;
+
+        // Duyệt qua các section để tìm item
+        for (const section of sections) {
+            if (section.items) {
+                const found = section.items.find(i => i.id === incomingItem.id);
+                if (found) {
+                    fullItem = found;
+                    break; 
+                }
+            }
+        }
+        
+        // Nếu không tìm thấy (hiếm), dùng tạm item gửi lên
+        const itemToView = fullItem || incomingItem;
+
+        if (itemToView.type?.toLowerCase() === 'folder') {
             return;
         }
-        const dataUrl = fileDataRef.current[item.id];
-        setSelectedItem({ ...item, dataUrl });
+
+        // [FIX QUAN TRỌNG]: Chỉ lấy dataUrl từ fileDataRef (file vừa upload từ máy lên)
+        // KHÔNG dùng item.s3Url vì đó là link chưa ký (sẽ bị 403 Forbidden)
+        // Khi dataUrl là null, component FileDetails sẽ tự động dùng s3Key để lấy link xịn.
+        const dataUrl = fileDataRef.current[itemToView.id];
+        
+        setSelectedItem({ ...itemToView, dataUrl });
     };
 
     const handleCloseModal = () => {
         setSelectedItem(null);
     };
 
-    const handleDownload = (item) => {
-        const dataUrl = fileDataRef.current[item.id];
-        if (dataUrl) {
-            const link = document.createElement('a');
-            link.href = dataUrl;
-            link.download = item.title;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
+    const handleDownload = async (item) => {
+        try {
+            // Get presigned download URL from backend
+            if (item.s3Key) {
+                const downloadUrl = await getDownloadUrl(item.s3Key);
+                
+                const link = document.createElement('a');
+                link.href = downloadUrl;
+                link.download = item.title;
+                link.target = '_blank';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            }
+        } catch (error) {
+            console.error("Download error:", error);
+            alert("Failed to download file");
         }
     };
 
@@ -107,6 +127,11 @@ export default function CourseStructureStudent() {
                         <h1 className="text-2xl font-bold text-primary">{courseTitle} ({courseID})</h1>
                         <p className="text-lg font-medium text-gray-700">{lecturer} [{className}]</p>
                     </div>
+                    <button 
+                        onClick={() => navigate("/courses")}
+                        className='px-5 py-2 bg-gray-100 cursor-pointer'
+                    >
+                    </button>
                 </div>
                 <div className="max-w-4xl mx-auto bg-white p-6 rounded-lg shadow-sm border border-gray-200">
                     {sections.map((section) => (

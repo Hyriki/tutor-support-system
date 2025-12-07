@@ -6,6 +6,7 @@ import FolderCard from "../../components/resource/FolderCard";
 import { Link, useNavigate } from "react-router-dom";
 import { useState, useEffect, useRef } from "react";
 import JSZip from "jszip";
+import { getDownloadUrl, downloadFolderAsZip, uploadFileWithPresignedUrl } from "../../lib/s3Client";
 
 import {
     FaRegCommentDots,
@@ -83,15 +84,29 @@ const PrivateStorage = () => {
 
 
     // ------------ VIEW DETAILS ----------
-    const handleViewDetails = (item) => {
-        // If it's a folder, enter the folder
-        if (item.type === "folder") {
-            setCurrentFolderId(item.id);
-            setSearchQuery(""); // Clear search when entering folder
+    const handleViewDetails = (itemFromCard) => {
+        // 1. Dùng ID để tìm lại object gốc trong danh sách itemList
+        // Object gốc này mới chứa đầy đủ s3Key, description, v.v.
+        console.log("Item từ Card gửi lên:", itemFromCard);
+        const fullItem = itemList.find(i => i.id === itemFromCard.id);
+        console.log("Item tìm thấy trong itemList:", fullItem);
+
+        // Kiểm tra an toàn: nếu không tìm thấy thì dùng tạm item từ card
+        const itemToView = fullItem || itemFromCard;
+
+        // 2. Nếu là Folder -> đi vào folder
+        if (itemToView.type === "folder") {
+            setCurrentFolderId(itemToView.id);
+            setSearchQuery(""); 
             return;
         }
-        const dataUrl = fileDataRef.current[item.id];
-        setSelectedItem({ ...item, dataUrl });
+
+        // 3. Nếu là File -> Hiện modal view details
+        // Lấy dataUrl từ local (nếu có) để xem ảnh vừa upload ngay lập tức
+        const dataUrl = fileDataRef.current[itemToView.id];
+        
+        // Quan trọng: Truyền itemToView (đã có s3Key) vào state
+        setSelectedItem({ ...itemToView, dataUrl });
     };
 
     const handleCloseModal = () => {
@@ -272,94 +287,139 @@ const PrivateStorage = () => {
     displayItems = getFilteredByType(displayItems);
 
     // -------------------- DOWNLOAD FILES ------------------------------
-    const handleDownloadFile = (data) => {
-        // If it's a folder, create a zip archive
-        if (data.type === "folder") {
-            handleDownloadFolder(data.id, data.title);
-            return;
-        }
+    // const handleDownloadFile = async (data) => {
+    //     try {
+    //         // If it's a folder, create a zip archive via backend
+    //         if (data.type === "folder") {
+    //             await handleDownloadFolder(data.id, data.title);
+    //             return;
+    //         }
 
-        const stored = fileDataRef.current[data.id];
-        let href = "";
-        if (stored && typeof stored === 'string' && stored.startsWith('data:')) {
-            href = stored;
-        } else {
-            // fallback: export metadata as JSON
-            const jsonString = JSON.stringify(data, null, 2);
-            const blob = new Blob([jsonString], { type: 'application/json'});
-            href = URL.createObjectURL(blob);
-        }
+    //         // For single files, use presigned URL from backend
+    //         if (data.s3Key) {
+    //             const downloadUrl = await getDownloadUrl(data.s3Key, data.title);
+    
+    //             const link = document.createElement('a');
+    //             link.href = downloadUrl;
+    //             link.download = data.title || 'download';
+                
+    //             // 3. Thêm target blank để xử lý an toàn hơn
+    //             link.target = '_blank'; 
+                
+    //             document.body.appendChild(link);
+    //             link.click();
+    //             document.body.removeChild(link);
+    //             return;
+    //         }
 
-        const link = document.createElement('a');
-        link.href = href;
-        link.download = data.title || 'download';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+    //         // Fallback: use localStorage data
+    //         const stored = fileDataRef.current[data.id];
+    //         let href = "";
+    //         if (stored && typeof stored === 'string' && stored.startsWith('data:')) {
+    //             href = stored;
+    //         } else {
+    //             // fallback: export metadata as JSON
+    //             const jsonString = JSON.stringify(data, null, 2);
+    //             const blob = new Blob([jsonString], { type: 'application/json'});
+    //             href = URL.createObjectURL(blob);
+    //         }
 
-        if (!href.startsWith('data:')) {
-            URL.revokeObjectURL(href);
+    //         const link = document.createElement('a');
+    //         link.href = href;
+    //         link.download = data.title || 'download';
+    //         document.body.appendChild(link);
+    //         link.click();
+    //         document.body.removeChild(link);
+
+    //         if (!href.startsWith('data:')) {
+    //             URL.revokeObjectURL(href);
+    //         }
+    //     } catch (error) {
+    //         console.error("Download error:", error);
+    //         alert("Failed to download file: " + error.message);
+    //     }
+    // }
+
+    const handleDownloadFile = async (incomingData) => {
+        try {
+            // [FIX QUAN TRỌNG]: Tìm lại item gốc trong state để đảm bảo có đủ field s3Key
+            // incomingData từ ResourceCard gửi lên có thể bị thiếu s3Key
+            const fullItem = itemList.find(i => i.id === incomingData.id) || incomingData;
+
+            // Nếu là Folder
+            if (fullItem.type === "folder") {
+                await handleDownloadFolder(fullItem.id, fullItem.title);
+                return;
+            }
+
+            // Nếu là File có S3 Key (Ưu tiên dùng cái này)
+            if (fullItem.s3Key) {
+                // Gọi hàm getDownloadUrl (Lưu ý: Không dùng destructuring {})
+                const downloadUrl = await getDownloadUrl(fullItem.s3Key, fullItem.title);
+                
+                const link = document.createElement('a');
+                link.href = downloadUrl;
+                link.download = fullItem.title || 'download';
+                link.target = '_blank'; // Mở tab mới cho an toàn
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                return;
+            }
+
+            // --- Phần Fallback cũ (giữ nguyên hoặc xóa nếu bạn đã chuyển hẳn sang S3) ---
+            const stored = fileDataRef.current[fullItem.id];
+            let href = "";
+            if (stored && typeof stored === 'string' && stored.startsWith('data:')) {
+                href = stored;
+            } else {
+                // Đây là nguyên nhân file bị corrupt trước đó (nó tạo file JSON)
+                const jsonString = JSON.stringify(fullItem, null, 2);
+                const blob = new Blob([jsonString], { type: 'application/json'});
+                href = URL.createObjectURL(blob);
+            }
+
+            const link = document.createElement('a');
+            link.href = href;
+            link.download = fullItem.title || 'download';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+
+            if (!href.startsWith('data:')) {
+                URL.revokeObjectURL(href);
+            }
+        } catch (error) {
+            console.error("Download error:", error);
+            alert("Failed to download file: " + error.message);
         }
     }
 
     const handleDownloadFolder = async (folderId, folderName) => {
-        const zip = new JSZip();
-        
-        // Get all files in this folder
-        const filesInFolder = itemList.filter(item => item.parentId === folderId && item.type !== "folder");
-        
-        if (filesInFolder.length === 0) {
-            alert("This folder is empty");
-            return;
-        }
-
-        let successCount = 0;
-        let failedFiles = [];
-        
-        // Add each file to the zip
-        for (const file of filesInFolder) {
-            const dataUrl = fileDataRef.current[file.id];
-            if (dataUrl && typeof dataUrl === 'string' && dataUrl.startsWith('data:')) {
-                try {
-                    // Convert data URL to blob
-                    const response = await fetch(dataUrl);
-                    const blob = await response.blob();
-                    zip.file(file.title, blob);
-                    successCount++;
-                    console.log(`Added ${file.title} to zip`);
-                } catch (err) {
-                    console.warn(`Failed to add ${file.title} to zip:`, err);
-                    failedFiles.push(file.title);
-                }
-            } else {
-                console.warn(`No data found for ${file.title} (id: ${file.id})`);
-                failedFiles.push(file.title);
-            }
-        }
-
-        if (successCount === 0) {
-            alert("No files could be added to the archive. Files may not have been stored.");
-            return;
-        }
-
-        // Generate and download the zip
         try {
-            const blob = await zip.generateAsync({ type: "blob" });
-            const link = document.createElement('a');
-            link.href = URL.createObjectURL(blob);
-            link.download = `${folderName}.zip`;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            URL.revokeObjectURL(link.href);
+            // Get all files in this folder
+            const filesInFolder = itemList.filter(item => item.parentId === folderId && item.type !== "folder");
             
-            if (failedFiles.length > 0) {
-                console.warn(`Zip created but ${failedFiles.length} files were missing: ${failedFiles.join(', ')}`);
-                alert(`Archive created with ${successCount} file(s). ${failedFiles.length} file(s) were not stored.`);
+            if (filesInFolder.length === 0) {
+                alert("This folder is empty");
+                return;
             }
+
+            // Get S3 keys from files that have them
+            const fileKeys = filesInFolder
+                .filter(f => f.s3Key)
+                .map(f => f.s3Key);
+
+            if (fileKeys.length === 0) {
+                alert("No files with S3 storage found in this folder");
+                return;
+            }
+
+            // Use backend API to download as ZIP (handles download directly)
+            await downloadFolderAsZip(folderName, fileKeys);
         } catch (error) {
-            console.error("Error creating zip file:", error);
-            alert("Failed to create zip archive");
+            console.error("Folder download error:", error);
+            alert("Failed to download folder: " + error.message);
         }
     }
 
@@ -403,41 +463,16 @@ const PrivateStorage = () => {
         });
     };
 
-    const saveSmallFileData = (id, file, sizeMB) => {
-        return new Promise((resolve, reject) => {
-            // persist file payloads up to 20MB into localStorage to avoid quota issues
-            if (sizeMB > 20) {
-                fileDataRef.current[id] = null;
-                console.warn(`File ${file.name} exceeds 20MB storage limit. Only metadata will be saved.`);
-                resolve(false); // Return false but don't reject
-                return;
-            }
-            
-            const reader = new FileReader();
-            reader.onload = () => {
-                try {
-                    const dataUrl = reader.result;
-                    fileDataRef.current[id] = dataUrl;
-                    // Store individual file data
-                    localStorage.setItem(`${STORAGE_FILEDATA_PREFIX}${id}`, dataUrl);
-                    console.log(`✓ Saved file data for ${file.name}`);
-                    resolve(true);
-                } catch (e) {
-                    if (e.name === 'QuotaExceededError') {
-                        console.warn(`✗ Storage quota exceeded for ${file.name}. File will not be saved.`);
-                        fileDataRef.current[id] = null;
-                        reject(new Error(`Storage full! Cannot save "${file.name}".`));
-                    } else {
-                        console.error("Error saving file data:", e);
-                        fileDataRef.current[id] = null;
-                        reject(e);
-                    }
-                }
-            }
-            reader.onerror = () => reject(new Error('Failed to read file'));
-            reader.readAsDataURL(file);
-        });
-    }
+    const uploadFileToS3 = async (file, uploadId) => {
+        try {
+            const result = await uploadFileWithPresignedUrl(file, "private-storage");
+            console.log(`✓ Uploaded file to S3: ${file.name}`, result);
+            return result; // Returns { key, url }
+        } catch (error) {
+            console.error(`✗ Failed to upload ${file.name} to S3:`, error);
+            throw error;
+        }
+    };
 
     const handleFilesSelected = (fileList) => {
         const files = Array.from(fileList);
@@ -466,67 +501,48 @@ const PrivateStorage = () => {
 
             setUploadQueue(prev => [...prev, uploadObj]);
 
-            // simulate upload progress; finalize within one interval
-            const interval = setInterval(() => {
-                setUploadQueue((prevQueue) => {
-                    let didFinish = false;
-                    const nextQueue = prevQueue.map(u => {
-                        if (u.id !== uploadId) return u;
-                        const increment = Math.random() * 20 + 5; // 5 - 25
-                        const nextProgress = Math.min(100, u.progress + increment);
-                        if (nextProgress >= 100) {
-                            didFinish = true;
-                        }
-                        return { ...u, progress: nextProgress };
-                    });
-
-                    if (!didFinish) return nextQueue;
-
-                    clearInterval(uploadIntervals.current[uploadId]);
-                    delete uploadIntervals.current[uploadId];
-
-                    // finalize file into storage - first save data, then add to list
-                    const item = nextQueue.find(u => u.id === uploadId) || uploadObj;
+            // Upload file to S3 directly
+            uploadFileToS3(file, uploadId)
+                .then((s3Result) => {
+                    // File uploaded to S3, now add to itemList with S3 metadata only
+                    const { size, unit } = formatSize(sizeMB);
+                    const ext = file.name.split('.').pop();
+                    const newItem = {
+                        id: uploadId,
+                        title: file.name,
+                        type: ext || 'file',
+                        size: String(size),
+                        size_unit: unit,
+                        lastModified: new Date().toISOString(),
+                        parentId: currentFolderId,
+                        isPrivate: true,
+                        s3Key: s3Result.key,
+                        s3Url: s3Result.url
+                    };
                     
-                    if (item.file) {
-                        saveSmallFileData(uploadId, item.file, item.sizeMB)
-                            .then((saved) => {
-                                // Only add to itemList if file was saved successfully
-                                const { size, unit } = formatSize(item.sizeMB);
-                                const ext = item.fileName.split('.').pop();
-                                const newItem = {
-                                    id: uploadId,
-                                    title: item.fileName,
-                                    type: ext || 'file',
-                                    size: String(size),
-                                    size_unit: unit,
-                                    lastModified: new Date().toISOString(),
-                                    parentId: currentFolderId,
-                                    isPrivate: true
-                                };
-                                setItemList(prev => {
-                                    const exists = prev.some(p => p.id === uploadId || (p.title?.toLowerCase() === newItem.title.toLowerCase() && p.size === newItem.size && p.size_unit === newItem.size_unit));
-                                    if (exists) return prev;
-                                    return [...prev, newItem];
-                                });
-                                setStorageUsed(prev => Math.round((prev + item.sizeMB) * 100) / 100);
-                            })
-                            .catch((error) => {
-                                // Don't add file to list if storage failed
-                                console.error(`Failed to save ${item.fileName}:`, error.message);
-                                alert(error.message + ' File not added to storage.');
-                            });
-                    }
-
-                    const updated = nextQueue.map(u => u.id === uploadId ? { ...u, progress: 100, status: 'done' } : u);
+                    setItemList(prev => {
+                        const exists = prev.some(p => p.id === uploadId);
+                        if (exists) return prev;
+                        return [...prev, newItem];
+                    });
+                    
+                    setStorageUsed(prev => Math.round((prev + sizeMB) * 100) / 100);
+                    
+                    // Update upload queue
+                    setUploadQueue(q => 
+                        q.map(u => u.id === uploadId ? { ...u, progress: 100, status: 'done' } : u)
+                    );
+                    
+                    // Remove from queue after delay
                     setTimeout(() => {
-                        setUploadQueue((q) => q.filter(x => x.id !== uploadId));
+                        setUploadQueue(q => q.filter(x => x.id !== uploadId));
                     }, 1200);
-                    return updated;
+                })
+                .catch((error) => {
+                    console.error(`Failed to upload ${file.name}:`, error);
+                    setUploadQueue(q => q.filter(x => x.id !== uploadId));
+                    setUploadErrors(prev => [...prev, `Failed to upload ${file.name}: ${error.message}`]);
                 });
-            }, 500 + Math.random() * 500);
-
-            uploadIntervals.current[uploadId] = interval;
         });
 
         if (newErrors.length) {

@@ -3,11 +3,15 @@ import { FaFolder } from "react-icons/fa";
 
 const FolderCard = ({ onCreate, onCancel }) => {
     const [folderName, setFolderName] = useState("New Folder");
+    const [error, setError] = useState("");
 
     const handleCreate = () => {
-        if (folderName.trim()) {
-            onCreate(folderName);
+        if (!folderName.trim()) {
+            setError("Folder name is required");
+            return;
         }
+        setError("");
+        onCreate(folderName);
     };
 
     const handleKeyDown = (e) => {
@@ -21,17 +25,25 @@ const FolderCard = ({ onCreate, onCancel }) => {
     return (
         <div className=" rounded-lg p-5  shadow-lg fixed inset-0 z-10 flex items-center justify-center bg-black/20">
             <div className="relative w-0.7 max-w-6xl p-6 bg-white border-2 border-primary rounded-lg shadow-xl m-8">
-                <div className="flex items-center mb-4">
-                    <FaFolder className="w-10 h-10 text-primary mr-3" />
-                    <input
-                        type="text"
-                        value={folderName}
-                        onChange={(e) => setFolderName(e.target.value)}
-                        onKeyDown={handleKeyDown}
-                        className="font-semibold text-sm text-black truncate w-full border-b-2 border-gray-300 focus:border-primary focus:outline-none"
-                        autoFocus
-                        onFocus={(e) => e.target.select()} 
-                    />
+                <div className="mb-4">
+                    <div className="flex items-center">
+                        <FaFolder className="w-10 h-10 text-primary mr-3" />
+                        <input
+                            type="text"
+                            value={folderName}
+                            onChange={(e) => {
+                                setFolderName(e.target.value);
+                                if (error) setError("");
+                            }}
+                            onKeyDown={handleKeyDown}
+                            className={`font-semibold text-sm text-black truncate w-full border-b-2 focus:outline-none ${
+                                error ? 'border-red-500 focus:border-red-500' : 'border-gray-300 focus:border-primary'
+                            }`}
+                            autoFocus
+                            onFocus={(e) => e.target.select()} 
+                        />
+                    </div>
+                    {error && <p className="text-red-500 text-sm mt-1 ml-13">{error}</p>}
                 </div>
                 <div className="flex justify-end gap-2">
                     <button 

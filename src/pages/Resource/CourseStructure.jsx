@@ -5,11 +5,12 @@ import CourseSection from '../../components/course/CourseSection';
 import FileDetails from './FileDetails';
 import FolderCard from '../../components/resource/FolderCard';
 import { FaPlus, FaTimes, FaGripVertical } from 'react-icons/fa';
+import { uploadFileWithPresignedUrl, deleteFromS3, getS3FileUrl } from '../../lib/s3Client';
 
 import { useState, useRef, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 const COURSE_STORAGE_KEY = "tss_course_sections_v1";
-const COURSE_FILEDATA_PREFIX = "tss_course_file_";
 
 // Deduplicate items within each section by id
 const dedupeSections = (sections) =>
@@ -33,6 +34,7 @@ const className = "CC04 - CC05";
 
 
 export default function CourseStructure() {
+    const navigate = useNavigate();
     const [sections, setSections] = useState([]);
     const [selectedItem, setSelectedItem] = useState(null);
     const [currentSectionId, setCurrentSectionId] = useState(null);
@@ -54,18 +56,7 @@ export default function CourseStructure() {
             setSections([]);
         }
 
-        // Load file data
-        const fileData = {};
-        saved?.forEach(section => {
-            section.items?.forEach(item => {
-                if (item.id) {
-                    const key = `${COURSE_FILEDATA_PREFIX}${item.id}`;
-                    const data = localStorage.getItem(key);
-                    if (data) fileData[item.id] = data;
-                }
-            });
-        });
-        fileDataRef.current = fileData;
+        // S3 URLs are already stored in items, no need to load from localStorage
     }, []);
 
     // Save sections to localStorage
@@ -80,7 +71,8 @@ export default function CourseStructure() {
             setCurrentSectionId(item.sectionId);
             return;
         }
-        const dataUrl = fileDataRef.current[item.id];
+        // Use S3 URL if available, otherwise fall back to localStorage
+        const dataUrl = item.s3Url || fileDataRef.current[item.id];
         setSelectedItem({ ...item, dataUrl });
     };
 
@@ -108,15 +100,22 @@ export default function CourseStructure() {
         setEditingSection(null);
     };
 
-    const handleDeleteSection = (sectionId) => {
+    const handleDeleteSection = async (sectionId) => {
         if (window.confirm("Delete this section and all its contents?")) {
-            const section = sections.find(s => s.sectionId === sectionId);
-            section?.items?.forEach(item => {
-                const key = `${COURSE_FILEDATA_PREFIX}${item.id}`;
-                localStorage.removeItem(key);
-                delete fileDataRef.current[item.id];
-            });
-            setSections(prev => prev.filter(sec => sec.sectionId !== sectionId));
+            try {
+                const section = sections.find(s => s.sectionId === sectionId);
+                // Delete all S3 files in this section
+                for (const item of section?.items || []) {
+                    if (item?.s3Key) {
+                        await deleteFromS3(item.s3Key);
+                    }
+                    delete fileDataRef.current[item.id];
+                }
+                setSections(prev => prev.filter(sec => sec.sectionId !== sectionId));
+            } catch (error) {
+                console.error("Delete section error:", error);
+                alert("Failed to delete section: " + error.message);
+            }
         }
     };
 
@@ -138,9 +137,9 @@ export default function CourseStructure() {
         setIsCreatingFolder(false);
     };
 
-    const handleUploadFiles = (sectionId, fileList, parentFolderId = null) => {
+    const handleUploadFiles = async (sectionId, fileList, parentFolderId = null) => {
         const files = Array.from(fileList);
-        files.forEach(file => {
+        for (const file of files) {
             const sizeMB = file.size / (1024 * 1024);
             const uploadId = crypto.randomUUID();
             const uploadObj = {
@@ -155,84 +154,98 @@ export default function CourseStructure() {
 
             setUploadQueue(prev => [...prev, uploadObj]);
 
-            const interval = setInterval(() => {
-                setUploadQueue(prevQueue => {
-                    let didFinish = false;
-                    const nextQueue = prevQueue.map(u => {
-                        if (u.id !== uploadId) return u;
-                        const increment = Math.random() * 20 + 5;
-                        const nextProgress = Math.min(100, u.progress + increment);
-                        if (nextProgress >= 100) didFinish = true;
-                        return { ...u, progress: nextProgress };
+            try {
+                // Simulate upload progress
+                const interval = setInterval(() => {
+                    setUploadQueue(prevQueue => {
+                        const nextQueue = prevQueue.map(u =>
+                            u.id === uploadId ? { ...u, progress: Math.min(90, u.progress + Math.random() * 15) } : u
+                        );
+                        return nextQueue;
                     });
+                }, 300);
 
-                    if (!didFinish) return nextQueue;
+                // Upload file to S3 via backend (no CORS issues)
+                const uploadResult = await uploadFileWithPresignedUrl(file);
+                clearInterval(interval);
 
-                    clearInterval(uploadIntervals.current[uploadId]);
-                    delete uploadIntervals.current[uploadId];
+                const ext = file.name.split('.').pop();
+                const newItem = {
+                    id: uploadId,
+                    title: file.name,
+                    type: ext || 'file',
+                    size: `${sizeMB.toFixed(2)} MB`,
+                    lastModified: new Date().toISOString(),
+                    isLocked: false,
+                    isVisible: true,
+                    parentId: parentFolderId,
+                    s3Key: uploadResult.key,
+                    s3Url: uploadResult.url
+                };
 
-                    const item = nextQueue.find(u => u.id === uploadId) || uploadObj;
-                    if (item.file) {
-                        const reader = new FileReader();
-                        reader.onload = (e) => {
-                            const dataUrl = e.target.result;
-                            const key = `${COURSE_FILEDATA_PREFIX}${uploadId}`;
-                            localStorage.setItem(key, dataUrl);
-                            fileDataRef.current[uploadId] = dataUrl;
+                setSections(prev => prev.map(sec => {
+                    if (sec.sectionId !== sectionId) return sec;
+                    const seen = new Set();
+                    const items = [...(sec.items || []), newItem].filter(it => {
+                        if (!it?.id) return true;
+                        if (seen.has(it.id)) return false;
+                        seen.add(it.id);
+                        return true;
+                    });
+                    return { ...sec, items };
+                }));
 
-                            const ext = item.fileName.split('.').pop();
-                            const newItem = {
-                                id: uploadId,
-                                title: item.fileName,
-                                type: ext || 'file',
-                                size: `${item.sizeMB.toFixed(2)} MB`,
-                                lastModified: new Date().toISOString(),
-                                isLocked: false,
-                                isVisible: true,
-                                isPrivate: true,
-                                parentId: parentFolderId
-                            };
-
-                            setSections(prev => prev.map(sec => {
-                                if (sec.sectionId !== sectionId) return sec;
-                                const seen = new Set();
-                                const items = [...(sec.items || []), newItem].filter(it => {
-                                    if (!it?.id) return true;
-                                    if (seen.has(it.id)) return false;
-                                    seen.add(it.id);
-                                    return true;
-                                });
-                                return { ...sec, items };
-                            }));
-                        };
-                        reader.readAsDataURL(item.file);
-                    }
-
-                    const updated = nextQueue.map(u => 
-                        u.id === uploadId ? { ...u, progress: 100, status: 'done' } : u
-                    );
-                    setTimeout(() => {
-                        setUploadQueue(q => q.filter(x => x.id !== uploadId));
-                    }, 1200);
-                    return updated;
-                });
-            }, 200);
-
-            uploadIntervals.current[uploadId] = interval;
-        });
+                setUploadQueue(prevQueue => prevQueue.map(u => 
+                    u.id === uploadId ? { ...u, progress: 100, status: 'done' } : u
+                ));
+                setTimeout(() => {
+                    setUploadQueue(q => q.filter(x => x.id !== uploadId));
+                }, 1200);
+            } catch (error) {
+                console.error("Upload error:", error);
+                setUploadQueue(prevQueue => prevQueue.map(u => 
+                    u.id === uploadId ? { ...u, status: 'error', error: error.message } : u
+                ));
+            }
+        }
     };
 
-    const handleDeleteItem = (sectionId, itemId) => {
+    const handleDeleteItem = async (sectionId, itemId) => {
         if (window.confirm("Delete this item?")) {
-            const key = `${COURSE_FILEDATA_PREFIX}${itemId}`;
-            localStorage.removeItem(key);
-            delete fileDataRef.current[itemId];
-            
-            setSections(prev => prev.map(sec => 
-                sec.sectionId === sectionId
-                    ? { ...sec, items: sec.items.filter(item => item.id !== itemId) }
-                    : sec
-            ));
+            try {
+                // Find the item to get S3 key
+                const section = sections.find(s => s.sectionId === sectionId);
+                const item = section?.items?.find(i => i.id === itemId);
+                
+                // If folder, delete all files inside recursively
+                if (item?.type?.toLowerCase() === 'folder') {
+                    const deleteItemsInFolder = (parentId) => {
+                        const childItems = section.items.filter(i => i.parentId === parentId);
+                        childItems.forEach(async (child) => {
+                            if (child.type?.toLowerCase() === 'folder') {
+                                deleteItemsInFolder(child.id);
+                            } else if (child.s3Key) {
+                                await deleteFromS3(child.s3Key);
+                            }
+                        });
+                    };
+                    deleteItemsInFolder(itemId);
+                } else if (item?.s3Key) {
+                    // Delete from S3 if it has an s3Key
+                    await deleteFromS3(item.s3Key);
+                }
+
+                delete fileDataRef.current[itemId];
+                
+                setSections(prev => prev.map(sec => 
+                    sec.sectionId === sectionId
+                        ? { ...sec, items: sec.items.filter(i => i.id !== itemId && i.parentId !== itemId) }
+                        : sec
+                ));
+            } catch (error) {
+                console.error("Delete error:", error);
+                alert("Failed to delete item: " + error.message);
+            }
         }
     };
 
@@ -271,6 +284,11 @@ export default function CourseStructure() {
                         <h1 className="text-2xl font-bold text-primary">{courseTitle} ({courseID})</h1>
                         <p className="text-lg font-medium text-gray-700">{lecturer} [{className}]</p>
                     </div>
+                    <button 
+                        onClick={() => navigate("/courses/student")}
+                        className='px-5 py-2 bg-gray-100 cursor-pointer'
+                        >
+                    </button>
                     <button 
                         onClick={() => setIsCreatingSection(true)}
                         className="px-5 py-2 bg-primary text-white font-semibold rounded-lg hover:bg-secondary transition duration-200 flex items-center gap-2"
@@ -362,11 +380,15 @@ export default function CourseStructure() {
 function SectionModal({ section, onSave, onCancel }) {
     const [title, setTitle] = useState(section?.title || "");
     const [description, setDescription] = useState(section?.description || "");
+    const [error, setError] = useState("");
 
     const handleSave = () => {
-        if (title.trim()) {
-            onSave(title, description);
+        if (!title.trim()) {
+            setError("Title is required");
+            return;
         }
+        setError("");
+        onSave(title, description);
     };
 
     return (
@@ -389,11 +411,17 @@ function SectionModal({ section, onSave, onCancel }) {
                     <input
                         type="text"
                         value={title}
-                        onChange={(e) => setTitle(e.target.value)}
+                        onChange={(e) => {
+                            setTitle(e.target.value);
+                            if (error) setError("");
+                        }}
                         placeholder="e.g., Module 1: Introduction"
-                        className="w-full px-4 py-2 border text-black border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                        className={`w-full px-4 py-2 border text-black rounded-lg focus:outline-none focus:ring-2 ${
+                            error ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-primary'
+                        }`}
                         autoFocus
                     />
+                    {error && <p className="text-red-500 text-sm mt-1">{error}</p>}
                 </div>
 
                 <div className="mb-6">

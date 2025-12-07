@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { getDownloadUrl, downloadFolderAsZip } from '../../lib/s3Client';
 import {
     FaChevronDown,
     FaChevronRight,
@@ -167,10 +168,36 @@ export default function CourseSectionStudent({
         }
     };
 
-    const handleDownload = (e, item) => {
+    const handleDownload = async (e, item) => {
         e.stopPropagation();
-        if (!item.isLocked && onDownload) {
-            onDownload(item);
+        if (item.isLocked) return;
+        
+        try {
+            // Folder: download as ZIP
+            if (item.type?.toLowerCase() === 'folder') {
+                // Get all items in THIS folder (not current view)
+                const folderItems = currentItems.filter(i => i.parentId === item.id && !i.isLocked && i.s3Key);
+                if (folderItems.length === 0) {
+                    alert("No files in this folder");
+                    return;
+                }
+
+                const fileKeys = folderItems.map(f => f.s3Key);
+                await downloadFolderAsZip(item.title, fileKeys);
+                // Function now handles the download directly
+            } else if (item.s3Key) {
+                // File: download single
+                const downloadUrl = await getDownloadUrl(item.s3Key, item.title);
+                const link = document.createElement('a');
+                link.href = downloadUrl;
+                link.download = item.title;
+                link.target = '_blank';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            }
+        } catch (error) {
+            console.error("Download error:", error);
         }
     };
 
@@ -197,7 +224,7 @@ export default function CourseSectionStudent({
                     ${isExpanded ? 'max-h-[1000px]' : 'max-h-0'}
                 `}
             >
-                <div className="overflow-hidden px-4 pb-4 text-gray-700 divide-y divide-secondary">
+                <div className="overflow-y-auto max-h-96 px-4 pb-4 text-gray-700 divide-y divide-secondary">
                     
                     {/* Breadcrumb Navigation */}
                     {currentFolderId && (
@@ -235,10 +262,10 @@ export default function CourseSectionStudent({
                                     {item.isLocked && (
                                         <FaLock className="w-5 h-5 text-gray-400" title="Locked" />
                                     )}
-                                    {!item.isLocked && item.type?.toLowerCase() !== 'folder' && (
+                                    {!item.isLocked && (
                                         <FaDownload 
                                             className="w-5 h-5 hover:text-blue-600 cursor-pointer" 
-                                            title="Download"
+                                            title={item.type?.toLowerCase() === 'folder' ? 'Download folder' : 'Download'}
                                             onClick={(e) => handleDownload(e, item)}
                                         />
                                     )}
