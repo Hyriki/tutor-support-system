@@ -12,7 +12,7 @@ import axios from 'axios';
 
 // Import các Component con
 import MessageWindow from './MessageWindow'; 
-import Notification from '../../components/notification/Notification_2'; 
+import Notification from '../notification/Notification'; 
 
 // Component Icon con
 const SearchIcon = () => <FaSearch />;
