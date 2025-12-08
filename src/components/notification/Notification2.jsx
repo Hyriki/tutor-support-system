@@ -168,28 +168,3 @@ export default function Notification({ isOpen, onClose }) {
         </div>
     );
 }
-File Notification.jsx
-import React, { useState, useEffect, useMemo } from 'react';
-import { RxCross2 } from 'react-icons/rx';
-import { TbCheck } from 'react-icons/tb';
-import { FaEnvelope } from 'react-icons/fa';
-
-// Hàm format ngày giờ
-const formatNotificationDate = (isoDate) => {
-    if (!isoDate) return '';
-    const date = new Date(isoDate);
-    const now = new Date();
-    const diff = (now - date) / (1000 * 60 * 60 * 24); // difference in days
-  
-    if (
-      date.getDate() === now.getDate() &&
-      date.getMonth() === now.getMonth() &&
-      date.getFullYear() === now.getFullYear()
-    ) {
-      return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
-    } else if (diff < 7) {
-      return date.toLocaleDateString([], { weekday: 'short' });
-    } else {
-      return date.toLocaleDateString([], { day: '2-digit', month: '2-digit', year: '2-digit' });
-    }
-};
